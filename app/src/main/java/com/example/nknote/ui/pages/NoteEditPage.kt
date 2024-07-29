@@ -1,130 +1,144 @@
 package com.example.nknote.ui.pages
 
 
-import android.graphics.Color
-import android.provider.CalendarContract
+import ando.file.compressor.ImageCompressEngine
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Context.INPUT_METHOD_SERVICE
+import android.graphics.Bitmap
+import android.net.Uri
 import android.util.Log
-import android.view.View
-import android.widget.Button
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import android.webkit.WebSettings
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.captionBarPadding
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidViewBinding
-import androidx.navigation.NavController
+import androidx.core.content.ContextCompat.getSystemService
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.nknote.AppViewModelProvider
 import com.example.nknote.R
-import com.example.nknote.ui.components.NKRichTextEditor
-import com.example.nknote.ui.components.NKRichTextEditorPreview
+import com.example.nknote.data.DataHandler
+import com.example.nknote.databinding.NoteRichEditorLayoutBinding
 import com.example.nknote.ui.components.SimpleTextField
-import com.example.nknote.ui.navigation.Destinations
 import com.example.nknote.ui.theme.NKNoteTheme
 import github.leavesczy.matisse.GlideImageEngine
 import github.leavesczy.matisse.Matisse
 import github.leavesczy.matisse.MatisseContract
 import github.leavesczy.matisse.MediaResource
 import github.leavesczy.matisse.MediaType
-import jp.wasabeef.richeditor.RichEditor
+import github.leavesczy.matisse.SmartCaptureStrategy
+import kotlinx.coroutines.launch
+import java.io.File
+import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Arrays
+import java.util.Date
 
 
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun NoteEditPage(onNavToHomePage:()->Unit) {
-    val defaultBackgroundColor: Int = MaterialTheme.colorScheme.secondary.toArgb()
-    val defaultEditorFontColor: Int = MaterialTheme.colorScheme.onSecondary.toArgb()
+fun NoteEditPage(onNavToHomePage:()->Unit,
+                 viewModel: NoteEditViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
+    val defaultBackgroundColor: Int = MaterialTheme.colorScheme.surface.toArgb()
+    val defaultEditorFontColor: Int = MaterialTheme.colorScheme.onSurface.toArgb()
     val defaultEditorFontSize: Int = 25
     val keyboardController = LocalSoftwareKeyboardController.current
-    //var viewSize = remember { mutableStateOf(0) }
-
+    val scope = rememberCoroutineScope()
     NKNoteTheme {
         //signal for activate action
-        var setFocusEditor: Boolean by rememberSaveable { mutableStateOf(false) }
-        var setBoldActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var undoActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var redoActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var fontSizeChangeActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var setItalicActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var insertImageActivated: Boolean by rememberSaveable { mutableStateOf(false) }
-        var setFontColorActivated : Boolean by rememberSaveable { mutableStateOf(false)}
-        var navToHomePageClicked : Boolean by rememberSaveable{ mutableStateOf(false)}
-        var hasInitialEditorSize : Boolean by rememberSaveable{ mutableStateOf(false)}
+        var setFocusEditor: Boolean by remember { mutableStateOf(false) }
+        var setBoldActivated: Boolean by remember { mutableStateOf(false) }
+        var undoActivated: Boolean by remember { mutableStateOf(false) }
+        var redoActivated: Boolean by remember { mutableStateOf(false) }
+        var fontSizeChangeActivated: Boolean by remember { mutableStateOf(false) }
+        var setItalicActivated: Boolean by remember { mutableStateOf(false) }
+        var insertImageActivated: Boolean by remember { mutableStateOf(false) }
+        var setFontColorActivated : Boolean by remember { mutableStateOf(false)}
+        var navToHomePageClicked : Boolean by remember{ mutableStateOf(false)}
+        var hasInitialEditor : Boolean by rememberSaveable{ mutableStateOf(false)}
+        var onSaveNote : Boolean by remember{ mutableStateOf(false)}
 
-        //state variables
-        var fontSize: Int by rememberSaveable { mutableStateOf(3) }
-
-        var insertedImageUri : String by rememberSaveable{ mutableStateOf("")}
+        //variables that should be save
+        var fontSize: Int by remember { mutableStateOf(3) }
+        var insertedImageUri : String by remember{ mutableStateOf("")}
+        val insertedImagesMap : SnapshotStateMap<String,String> = remember {
+            mutableStateMapOf()
+        }
+        //set up matisse for pick up image from media folder
         val mediaPickerLauncher =
             rememberLauncherForActivityResult(contract = MatisseContract()) { result: List<MediaResource>? ->
                 if (!result.isNullOrEmpty()) {
                     insertImageActivated = false
                     val mediaResource = result[0]
                     insertedImageUri = mediaResource.uri.toString()
+                    Log.d("asd","type:${mediaResource.mimeType}")
                 }
             }
 
         val matisse = Matisse(
             maxSelectable = 1,
             imageEngine = GlideImageEngine(),
-            mediaType = MediaType.ImageOnly
+            mediaType = MediaType.ImageOnly,
+            captureStrategy = SmartCaptureStrategy("com.NKNote.provider.image_provider")
         )
+        if(!insertedImageUri.isNullOrEmpty())
+        {
+            val insertedImageBitmap: Bitmap? = ImageCompressEngine.compressPure(Uri.parse(insertedImageUri))
+            insertedImagesMap.put(insertedImageUri,DataHandler.bitmapToString(insertedImageBitmap as Bitmap) as String)
+        }
         val defaultTitle = stringResource(id = R.string.notepage_topbar_title_default_chs)
-        var titleInput by rememberSaveable{ mutableStateOf(defaultTitle)}
+        var titleInput by remember{ mutableStateOf(defaultTitle)}
         IconButton(onClick = {  }) {
             Icon(
                 imageVector = Icons.Filled.Menu,
@@ -133,11 +147,62 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
         }
         Scaffold(
             modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
-                .statusBarsPadding(),
+                .fillMaxSize(),
+            topBar = {
+                Spacer(modifier = Modifier.statusBarsPadding())
+                TopAppBar(title = {
+                SimpleTextField(
+                    value = titleInput,
+                    onValueChange = { titleInput = it },
+                    singleLine = true,
+                    placeholderText = stringResource(id = R.string.notepage_topbar_title_placerholder_chs),
+                )
+            },
+                navigationIcon = {
+                    //Here to exit edit page
+                    IconButton(onClick = {
+                        navToHomePageClicked = true
+                        onNavToHomePage()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        /*TODO*/
+                        scope.launch {
+                        viewModel.deleteById(5)
+                            viewModel.deleteById(6)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Filled.DateRange,
+                            contentDescription = null
+                        )
+                    }
+                    IconButton(onClick = {
+                        //send signal of saving note
+                        onSaveNote = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null
+                        )
+                    }
+                },
+                colors = TopAppBarColors(
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.onPrimary,
+                    MaterialTheme.colorScheme.onPrimary,
+                    MaterialTheme.colorScheme.onPrimary
+                )
+            )},
             content = {
-                it
+                paddingValues->
                 var viewSize = 0
                 Column(
                     modifier = Modifier
@@ -145,6 +210,10 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
                         .onGloballyPositioned { coordinates ->
                             viewSize = coordinates.size.height
                         }
+                        .verticalScroll(
+                            state = rememberScrollState(),
+                            reverseScrolling = true
+                        )
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onTap = {
@@ -152,126 +221,98 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
                                     setFocusEditor = true
                                 }
                             )
-                        }
-                    ,
-                    verticalArrangement = Arrangement.Top
+                        },
+                    verticalArrangement = Arrangement.Top,
                 )
                 {
-                    TopAppBar(title = {
-                        SimpleTextField(value = titleInput,
-                            onValueChange = { titleInput = it },
-                            singleLine = true,
-                            placeholderText = stringResource(id = R.string.notepage_topbar_title_placerholder_chs),
-                        )
-                    },
-                        navigationIcon = {
-                            //Here to exit edit page
-                            IconButton(onClick = {
-                                navToHomePageClicked = true
-                                onNavToHomePage()
-
-                            }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = null
-                                )
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = {
-                                /*TODO*/
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Filled.DateRange,
-                                    contentDescription = null
-                                )
-                            }
-                            IconButton(onClick = {
-                                /*TODO*/
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = null
-                                )
-                            }
-                        },
-                        colors = TopAppBarColors(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.onPrimary,
-                            MaterialTheme.colorScheme.onPrimary,
-                            MaterialTheme.colorScheme.onPrimary
-                        )
-                    )
-                    AndroidView(
+                    AndroidViewBinding(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .captionBarPadding(),
-                        factory = { context ->
-                            RichEditor(context).apply {
-                                Log.d("asd","height:$viewSize")
-                                setEditorHeight(viewSize)
-                                setEditorFontSize(defaultEditorFontSize)
-                                setEditorFontColor(defaultEditorFontColor)
-                                setEditorBackgroundColor(defaultBackgroundColor)
-                                setPlaceholder("insert here")
-                                setInputEnabled(true)
-                            }
-
-                        },
+                            .fillMaxSize()
+                            .padding(
+                                top = paddingValues.calculateTopPadding(),
+                                bottom = paddingValues.calculateBottomPadding()
+                            ),
+                        factory = NoteRichEditorLayoutBinding::inflate ,
                         update = {
-                            if(!hasInitialEditorSize&&viewSize>0)
+                            if(!hasInitialEditor)
                             {
-                                it.setEditorHeight(viewSize)
+                                hasInitialEditor = true
+                                editor.setEditorHeight(viewSize)
+                                editor.setEditorFontSize(defaultEditorFontSize)
+                                editor.setEditorFontColor(defaultEditorFontColor)
+                                editor.setEditorBackgroundColor(defaultBackgroundColor)
+                                editor.setPlaceholder("insert here")
+                                editor.setInputEnabled(true)
                             }
-                            //undo
+                            //focus on editor
                             if (setFocusEditor) {
                                 setFocusEditor = false
-                                it.focusEditor()
-
+                                editor.focusEditor()
+                                val inputMethodManager :InputMethodManager = editor.getContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                                inputMethodManager.showSoftInput(editor,0)
                             }
-
                             //undo
                             if (undoActivated) {
                                 undoActivated = false
-                                it.undo()
+                                editor.undo()
                             }
-
                             //redo
                             if (redoActivated) {
                                 redoActivated = false
-                                it.redo()
+                                editor.redo()
                             }
                             //set bold
                             if (setBoldActivated) {
                                 setBoldActivated = false
-                                it.setBold()
+                                editor.setBold()
                             }
                             //font add
                             if (fontSizeChangeActivated) {
                                 fontSize = fontSize % 7 + 1
                                 fontSizeChangeActivated = false
-                                it.setFontSize(fontSize)
+                                editor.setFontSize(fontSize)
                             }
-
+                            //set italic
                             if (setItalicActivated) {
                                 setItalicActivated = false
-                                it.setItalic()
+                                editor.setItalic()
+                                val ss = editor.html
+                                Log.d("asd",ss)
                             }
-
                             //insert image
                             if (!insertedImageUri.isNullOrEmpty()) {
-
-                                it.insertImage(insertedImageUri, "dach", 320)
+                                editor.insertImage(insertedImageUri, "" )
                                 insertedImageUri = ""
                             }
-
                             //navigate back to home page
                             if(navToHomePageClicked)
                             {
                                 navToHomePageClicked = false
                                 //it.destroy()
+                                onNavToHomePage()
+                            }
+                            //save note and back
+                            if(onSaveNote)
+                            {
+                                onSaveNote = false
+                                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                                val md = MessageDigest.getInstance("MD5")
+                                val currentDate = sdf.format(Date())
+                                //create byte array using title + localtime , for example: "Today is so bad 2024-07-29 11:13:59"
+                                md.update("${titleInput} ${currentDate}".toByte())
+                                val md5ID = md.digest().toString()
+                                viewModel.updateUiState(
+                                    NoteItemDetails(
+                                        title = titleInput,
+                                        textHtml = editor.html,
+                                        picture = insertedImagesMap.toMap(),
+                                        date = currentDate,
+                                )
+                                )
+                                insertedImagesMap.clear()
+                                scope.launch {
+                                    viewModel.insertNote()
+                                }
                                 onNavToHomePage()
                             }
                         },
@@ -281,18 +322,18 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
             bottomBar = {
                 Surface(
                     color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
                 ) {
                     Row(
                         modifier = Modifier
-                            .statusBarsPadding()
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .imePadding()
                     ) {
                         Row(
                             modifier = Modifier
-                                .statusBarsPadding()
                                 .horizontalScroll(rememberScrollState())
                                 .fillMaxWidth(),
                         ) {
@@ -324,7 +365,6 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
                                     contentDescription = ""
                                 )
                             }
-
                             //Button for font size change
                             IconButton(onClick = {
                                 fontSizeChangeActivated = true
@@ -335,7 +375,6 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
                                     contentDescription = ""
                                 )
                             }
-
                             //Button for insert picture
                             IconButton(onClick = {
                                 insertImageActivated = true
@@ -380,15 +419,14 @@ fun NoteEditPage(onNavToHomePage:()->Unit) {
                 }
             }
                     )
-
     }
-
 }
 
 
 @Preview
 @Composable
+@SuppressLint("SetJavaScriptEnabled")
 fun NoteEditPagePreview() {
-    //NoteEditPage()
+    NoteEditPage({})
 }
 

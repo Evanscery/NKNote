@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">NKNote</string>
     <string name="title_activity_main_frame">MainFrame</string>
+    <string name="homepage_sidebar_explore_chs">探索</string>
+    <string name="notepage_topbar_title_default_chs">标题</string>
+    <string name="notepage_topbar_title_placerholder_chs">请输入标题</string>
+    <string name="note_default_title_chs">无标题</string>
+    <string name="note_default_description_chs">这篇笔记没有描述</string>
+    <string name="note_rich_text_editor_placeholder_chs">输入内容</string>
+    <string name="homepage_no_note_description_chs">不存在日记</string>
 </resources>

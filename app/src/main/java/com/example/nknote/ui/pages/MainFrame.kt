@@ -1,10 +1,16 @@
 package com.example.nknote.ui.pages
 
+import android.provider.ContactsContract.CommonDataKinds.Note
+import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -13,6 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +36,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,8 +54,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,17 +67,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.example.nknote.AppViewModelProvider
 import com.example.nknote.R
+import com.example.nknote.data.NoteItem
 import com.example.nknote.models.entity.DrawerNavigationItem
 import com.example.nknote.ui.theme.NKNoteTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import com.example.nknote.ui.components.SimpleTextField
+import com.example.nknote.ui.navigation.Destinations
+import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.Date
 
 @Preview("HomePage")
 @Composable
@@ -74,11 +97,14 @@ fun AppPreview() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainFrame() {
+fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
+              onNavToNoteCheckPage : (Int)->Unit = {},
+              viewModel: MainFrameViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
     NKNoteTheme {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         var currentNavigationIndex by remember { mutableStateOf(0) }
+        val mainFrameUiState by viewModel.mainFrameUiState.collectAsState()
         //SideBar
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -92,10 +118,10 @@ fun MainFrame() {
                 ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.secondaryContainer) {
                     /* Drawer content */
                     val navigationItems = listOf(
-                        DrawerNavigationItem(text = "统计", icon = Icons.Filled.Person),
-                        DrawerNavigationItem(text = "同步", icon = Icons.Filled.Refresh),
-                        DrawerNavigationItem(text = "探索", icon = Icons.Filled.Face),
-                        DrawerNavigationItem(text = "回收站", icon = Icons.Filled.Delete),
+                        DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_stastics_chs), icon = Icons.Filled.Person),
+                        DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_update_chs), icon = Icons.Filled.Refresh),
+                        DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_explore_chs), icon = Icons.Filled.Face),
+                        DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_recyclebin_chs), icon = Icons.Filled.Delete),
                     )
 
                     Surface(modifier = Modifier
@@ -157,7 +183,10 @@ fun MainFrame() {
             content = {
                 AppHomePageMainContent(scope = scope,
                     drawerState = drawerState,
+                    onNoteItemClicked = onNavToNoteCheckPage,
                     currentNavigationIndex = currentNavigationIndex,
+                    mainFrameUiState = mainFrameUiState,
+                    onNavClicked = { onNavToNoteEditPage() }
                     )
             }
         )
@@ -169,7 +198,10 @@ fun MainFrame() {
 fun AppHomePageMainContent(
     scope : CoroutineScope,
     drawerState: DrawerState,
+    onNoteItemClicked: (Int) -> Unit = {},
+    onNavClicked: () -> Unit = {},
     currentNavigationIndex : Int,
+    mainFrameUiState : MainFrameUiState,
     modifier: Modifier = Modifier
 ){
     var searchState by remember { mutableStateOf(false) }
@@ -199,22 +231,21 @@ fun AppHomePageMainContent(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {}
+                onClick = { onNavClicked.invoke() }
             )
             {
                 Icon(Icons.Filled.Add, contentDescription = "")
             }
         },
         content = {
-            it
-            Column(modifier=Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center){
-                Text(text = "Current choose is $searchState",
-                    style = MaterialTheme.typography.titleLarge)
-
+                innerPadding ->
+            AppNoteListBody(
+                itemList = mainFrameUiState.itemList,
+                onItemClick = onNoteItemClicked,
+                modifier = modifier.fillMaxSize(),
+                contentPadding = innerPadding,
+            )
             }
-
-        }
     )
 }
 
@@ -248,7 +279,8 @@ fun AppNavigationTopBar(
                         contentDescription = null
                     )
                 }
-                Text(text = "2024/7/7", fontSize = 20.sp, lineHeight = 25.sp, textAlign = TextAlign.End)
+                val currentDate = SimpleDateFormat("yyyy-MM-dd").format(Date())
+                Text(text = currentDate, fontSize = 20.sp, lineHeight = 25.sp, textAlign = TextAlign.End)
                 //TextField(value = "0", onValueChange ={} )
                 Row(
                     modifier = modifier.fillMaxWidth(),
@@ -322,3 +354,95 @@ fun AppSearchTopBar(
         }
     }
 }
+
+@Composable
+fun AppNoteListBody(itemList: List<NoteItem>,
+                    onItemClick: (Int) -> Unit,
+                    modifier: Modifier = Modifier,
+                    contentPadding: PaddingValues = PaddingValues(0.dp),)
+{
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier,
+    ) {
+        if (itemList.isEmpty()) {
+            Text(
+                text = stringResource(R.string.homepage_no_note_description_chs),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(contentPadding),
+            )
+        } else {
+            MainFrameNoteList(
+                itemList = itemList,
+                onItemClick = { onItemClick(it.id) },
+                contentPadding = contentPadding,
+                modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+            )
+        }
+    }
+}
+
+@Composable
+fun MainFrameNoteList(
+    itemList: List<NoteItem>,
+    onItemClick: (NoteItem) -> Unit,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier
+)
+{
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = contentPadding
+    ) {
+        items(items = itemList, key = { it.id } ) { item ->
+            MainFrameNoteItem(item = item,
+                modifier = Modifier
+                    .padding(dimensionResource(id = R.dimen.padding_small)),
+                onItemClick = {onItemClick(item)})
+        }
+    }
+}
+
+@Composable
+fun MainFrameNoteItem(item: NoteItem,
+                      onItemClick: (NoteItem) -> Unit,
+                      modifier: Modifier = Modifier)
+{
+    Card(
+        shape = CardDefaults.outlinedShape,
+        border = BorderStroke(2.dp,MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(2.dp),
+        modifier = Modifier
+            .padding(5.dp)
+            .wrapContentSize()
+    ){
+        Box(
+            modifier = Modifier.clickable { onItemClick(item) }
+        ){
+            Column(
+                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large)),
+                verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_small))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = item.date,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
+

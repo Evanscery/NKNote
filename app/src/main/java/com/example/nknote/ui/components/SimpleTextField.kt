@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import com.example.nknote.ui.theme.NKNoteTheme
+import com.example.nknote.ui.theme.primaryDark
 
 @Composable
 fun SimpleTextField(
@@ -44,7 +45,7 @@ fun SimpleTextField(
     placeholderText: String = "",
     fontSize: TextUnit = MaterialTheme.typography.bodyMedium.fontSize,
     onTextLayout: (TextLayoutResult) -> Unit = {},
-    cursorBrush: Brush = SolidColor(Color.Black),
+    cursorBrush: Brush = SolidColor(MaterialTheme.colorScheme.onPrimary),
 ) {
     BasicTextField(modifier = modifier
         .fillMaxWidth(),

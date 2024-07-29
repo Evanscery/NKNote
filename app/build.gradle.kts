@@ -1,7 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("com.google.devtools.ksp") version "1.9.0-1.0.13"
 }
+
 
 android {
     namespace = "com.example.nknote"
@@ -9,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.nknote"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -38,6 +40,8 @@ android {
     }
     buildFeatures {
         compose = true
+        //enable view binding to use xml layout files(view) in compose
+        viewBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -47,10 +51,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+
 }
 
 dependencies {
-
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -59,6 +65,42 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    //compose navigation
+    val nav_version = "2.7.7"
+    implementation ("androidx.navigation:navigation-compose:$nav_version")
+    /*
+    *rich text editor
+    * https://github.com/wasabeef/richeditor-android
+     */
+    implementation ("jp.wasabeef:richeditor-android:2.0.0")
+    /*
+    * Matisse
+    * Picture picking frame
+    * https://github.com/leavesCZY/Matisse
+     */
+    implementation("io.github.leavesczy:matisse:2.1.0")
+
+    //Image loader glide
+    val glideComposeVersion = "1.0.0-beta01"
+    implementation("com.github.bumptech.glide:compose:$glideComposeVersion")
+
+    //view binding
+    implementation ("androidx.compose.ui:ui-viewbinding")
+
+    //Room
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+
+    //Gson
+    implementation ("com.google.code.gson:gson:2.11.0")
+
+    //FileOperator
+    implementation ("com.github.javakam:file.core:3.9.8@aar")      //Core library required
+    implementation ("com.github.javakam:file.selector:3.9.8@aar")  //File selector
+    implementation ("com.github.javakam:file.compressor:3.9.8@aar")//Image compression, based on Luban
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
