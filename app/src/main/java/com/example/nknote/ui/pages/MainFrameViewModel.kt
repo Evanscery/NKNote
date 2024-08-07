@@ -25,9 +25,11 @@ class MainFrameViewModel(private val itemsRepository: ItemsRepository) : ViewMod
                 started = SharingStarted.WhileSubscribed(TIMEOUT_MILLIS),
                 initialValue = MainFrameUiState()
             )
-    suspend fun getItem(id:Int) : Flow<NoteItem?> {
+    suspend fun getItem(id:String) : Flow<NoteItem?> {
         return itemsRepository.getItemStream(id)
     }
+
+    suspend fun deleteItemById(id : String) = itemsRepository.deleteById(id)
 
     companion object {
         private const val TIMEOUT_MILLIS = 5_000L

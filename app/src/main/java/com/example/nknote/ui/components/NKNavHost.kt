@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.nknote.ui.navigation.Destinations
 import com.example.nknote.ui.pages.MainFrame
+import com.example.nknote.ui.pages.NKRandomPage
 import com.example.nknote.ui.pages.NoteCheckPage
 import com.example.nknote.ui.pages.NoteEditPage
 
@@ -29,20 +30,27 @@ fun NKNavHost() {
         composable(route = Destinations.HomePage.route){
             MainFrame(onNavToNoteEditPage = { navController.navigate(Destinations.NoteEditPage.route) },
                 onNavToNoteCheckPage = {
-                    navController.navigate("${Destinations.NoteCheckPage.route}/${it}")
+                    navController.navigate("${Destinations.NoteCheckPage.route}/${it}"){ launchSingleTop = true }
+                },
+                onNavToRandomPage = {
+                    navController.navigate(Destinations.RandomPage.route)
                 }
             )
         }
         composable(Destinations.NoteEditPage.route){
-            NoteEditPage({ navController.navigate(Destinations.HomePage.route) })
+            NoteEditPage({ navController.navigate(Destinations.HomePage.route){ launchSingleTop = true } })
         }
 
         composable(route = "${Destinations.NoteCheckPage.route}/{${Destinations.NoteCheckPage.args}}",
             arguments = listOf(navArgument(Destinations.NoteCheckPage.args){
-                type = NavType.IntType
             }))
         {
-            NoteCheckPage()
+                NoteCheckPage(onNavBack = {navController.popBackStack()})
+        }
+
+        composable(route = Destinations.RandomPage.route)
+        {
+            NKRandomPage(onNavBack = {navController.popBackStack()})
         }
 
     }

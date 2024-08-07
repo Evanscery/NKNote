@@ -10,6 +10,7 @@ enum class Destinations(val route : String,
     val args : String = "itemId")  {
     HomePage(route ="HomePage"),
     NoteCheckPage(route = "NoteCheckPage"),
-    NoteEditPage(route = "NoteEditPage");
+    NoteEditPage(route = "NoteEditPage"),
+    RandomPage(route = "RandomPage");
 }
 

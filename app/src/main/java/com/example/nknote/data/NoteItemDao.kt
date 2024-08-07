@@ -1,6 +1,7 @@
 package com.example.nknote.data
 
 import android.provider.ContactsContract.CommonDataKinds.Note
+import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -12,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NoteItemDao {
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.ABORT, entity = NoteItem::class)
     suspend fun insert(item:NoteItem)
 
     @Update
@@ -25,13 +26,12 @@ interface NoteItemDao {
     fun getAllItems() : Flow<List<NoteItem>>
 
     @Query("SELECT * from note WHERE id = :id")
-    fun getItem(id: Int): Flow<NoteItem>
+    fun getItem(id: String): Flow<NoteItem?>
 
     @Query("SELECT picture from note WHERE id = :id")
-    fun getPicture(id: Int): Flow<String>
+    fun getPicture(id: String): Flow<String>
 
     @Query("DELETE FROM note WHERE id = :id")
-    suspend fun deleteById(id: Int)
-
+    suspend fun deleteById(id: String)
 
 }

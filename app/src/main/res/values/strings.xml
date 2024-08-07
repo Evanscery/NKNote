@@ -8,4 +8,5 @@
     <string name="note_default_description_chs">这篇笔记没有描述</string>
     <string name="note_rich_text_editor_placeholder_chs">输入内容</string>
     <string name="homepage_no_note_description_chs">不存在日记</string>
+    <string name="homepage_noteitem_menu_delete_chs">删除</string>
 </resources>

@@ -4,9 +4,11 @@ import android.provider.ContactsContract.CommonDataKinds.Note
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,15 +33,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -67,9 +73,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -98,7 +108,8 @@ fun AppPreview() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
-              onNavToNoteCheckPage : (Int)->Unit = {},
+              onNavToNoteCheckPage : (String)->Unit = {},
+              onNavToRandomPage : ()->Unit = {},
               viewModel: MainFrameViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
     NKNoteTheme {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -122,6 +133,7 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_update_chs), icon = Icons.Filled.Refresh),
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_explore_chs), icon = Icons.Filled.Face),
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_recyclebin_chs), icon = Icons.Filled.Delete),
+                        DrawerNavigationItem(text = "随机数",icon = Icons.Filled.Info)
                     )
 
                     Surface(modifier = Modifier
@@ -186,10 +198,26 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                     onNoteItemClicked = onNavToNoteCheckPage,
                     currentNavigationIndex = currentNavigationIndex,
                     mainFrameUiState = mainFrameUiState,
-                    onNavClicked = { onNavToNoteEditPage() }
+                    onNavClicked = { onNavToNoteEditPage() },
+                    onItemDeleteClick = {
+                        Log.d("asd","note:$it,should has been deleted")
+                        scope.launch {
+                            viewModel.deleteItemById(it)
+                        }
+                    }
                     )
             }
         )
+        when(currentNavigationIndex)
+        {
+            4 ->{
+                    currentNavigationIndex = 0
+                    onNavToRandomPage()
+            }
+            else ->{
+
+            }
+        }
     }
 }
 
@@ -198,8 +226,9 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
 fun AppHomePageMainContent(
     scope : CoroutineScope,
     drawerState: DrawerState,
-    onNoteItemClicked: (Int) -> Unit = {},
+    onNoteItemClicked: (String) -> Unit = {},
     onNavClicked: () -> Unit = {},
+    onItemDeleteClick: (String) -> Unit,
     currentNavigationIndex : Int,
     mainFrameUiState : MainFrameUiState,
     modifier: Modifier = Modifier
@@ -243,6 +272,7 @@ fun AppHomePageMainContent(
                 itemList = mainFrameUiState.itemList,
                 onItemClick = onNoteItemClicked,
                 modifier = modifier.fillMaxSize(),
+                onItemDeleteClick = onItemDeleteClick,
                 contentPadding = innerPadding,
             )
             }
@@ -357,7 +387,8 @@ fun AppSearchTopBar(
 
 @Composable
 fun AppNoteListBody(itemList: List<NoteItem>,
-                    onItemClick: (Int) -> Unit,
+                    onItemClick: (String) -> Unit,
+                    onItemDeleteClick: (String) -> Unit,
                     modifier: Modifier = Modifier,
                     contentPadding: PaddingValues = PaddingValues(0.dp),)
 {
@@ -376,6 +407,7 @@ fun AppNoteListBody(itemList: List<NoteItem>,
             MainFrameNoteList(
                 itemList = itemList,
                 onItemClick = { onItemClick(it.id) },
+                onItemMenuDeleteClick = {onItemDeleteClick(it.id)},
                 contentPadding = contentPadding,
                 modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_small))
             )
@@ -387,6 +419,7 @@ fun AppNoteListBody(itemList: List<NoteItem>,
 fun MainFrameNoteList(
     itemList: List<NoteItem>,
     onItemClick: (NoteItem) -> Unit,
+    onItemMenuDeleteClick: (NoteItem)->Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier
 )
@@ -399,16 +432,20 @@ fun MainFrameNoteList(
             MainFrameNoteItem(item = item,
                 modifier = Modifier
                     .padding(dimensionResource(id = R.dimen.padding_small)),
-                onItemClick = {onItemClick(item)})
+                onItemClick = {onItemClick(item)},
+                onMenuDeleteClick = {onItemMenuDeleteClick(item)})
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainFrameNoteItem(item: NoteItem,
                       onItemClick: (NoteItem) -> Unit,
+                      onMenuDeleteClick : (NoteItem) ->Unit,
                       modifier: Modifier = Modifier)
 {
+    var menuExpanded by remember { mutableStateOf(false)}
     Card(
         shape = CardDefaults.outlinedShape,
         border = BorderStroke(2.dp,MaterialTheme.colorScheme.surfaceContainer),
@@ -418,7 +455,10 @@ fun MainFrameNoteItem(item: NoteItem,
             .wrapContentSize()
     ){
         Box(
-            modifier = Modifier.clickable { onItemClick(item) }
+            modifier = Modifier.combinedClickable (
+                onLongClick = {menuExpanded=true},
+                onClick = {onItemClick(item)},
+                            )
         ){
             Column(
                 modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large)),
@@ -443,6 +483,43 @@ fun MainFrameNoteItem(item: NoteItem,
                 )
             }
         }
+        noteFloatingMenu(
+            menuExpanded = menuExpanded,
+            onMenuExpandedStateChange = { menuExpanded = !menuExpanded },
+            onMenuDeleteClick = {onMenuDeleteClick(item)})
+        }
+    }
+
+
+
+@Composable
+fun noteFloatingMenu(
+    menuExpanded : Boolean = false,
+    onMenuExpandedStateChange: ()-> Unit,
+    onMenuDeleteClick: () -> Unit,
+){
+    DropdownMenu(expanded = menuExpanded,
+        onDismissRequest = { onMenuExpandedStateChange() }) {
+        DropdownMenuItem(onClick = { onMenuExpandedStateChange()
+            onMenuDeleteClick()},
+            text ={
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ){
+                    Icon(Icons.Filled.Delete, contentDescription = "",tint = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.padding(2.dp))
+                    Text(
+                        text = stringResource(id = R.string.homepage_noteitem_menu_delete_chs),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+            },
+            modifier = Modifier.wrapContentSize())
     }
 }
 

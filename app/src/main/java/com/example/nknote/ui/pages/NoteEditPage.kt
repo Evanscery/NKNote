@@ -2,7 +2,9 @@ package com.example.nknote.ui.pages
 
 
 import ando.file.compressor.ImageCompressEngine
+import ando.file.core.FileOperator.getApplication
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.Context
 import android.content.Context.INPUT_METHOD_SERVICE
 import android.graphics.Bitmap
@@ -68,6 +70,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.nknote.AppViewModelProvider
 import com.example.nknote.R
 import com.example.nknote.data.DataHandler
+import com.example.nknote.data.DataHandler.stringWithMD5
 import com.example.nknote.databinding.NoteRichEditorLayoutBinding
 import com.example.nknote.ui.components.SimpleTextField
 import com.example.nknote.ui.theme.NKNoteTheme
@@ -139,12 +142,6 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
         }
         val defaultTitle = stringResource(id = R.string.notepage_topbar_title_default_chs)
         var titleInput by remember{ mutableStateOf(defaultTitle)}
-        IconButton(onClick = {  }) {
-            Icon(
-                imageVector = Icons.Filled.Menu,
-                contentDescription = null
-            )
-        }
         Scaffold(
             modifier = Modifier
                 .fillMaxSize(),
@@ -174,8 +171,6 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
                     IconButton(onClick = {
                         /*TODO*/
                         scope.launch {
-                        viewModel.deleteById(5)
-                            viewModel.deleteById(6)
                         }
                     }) {
                         Icon(
@@ -203,13 +198,9 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
             )},
             content = {
                 paddingValues->
-                var viewSize = 0
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .onGloballyPositioned { coordinates ->
-                            viewSize = coordinates.size.height
-                        }
                         .verticalScroll(
                             state = rememberScrollState(),
                             reverseScrolling = true
@@ -237,11 +228,9 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
                             if(!hasInitialEditor)
                             {
                                 hasInitialEditor = true
-                                editor.setEditorHeight(viewSize)
                                 editor.setEditorFontSize(defaultEditorFontSize)
                                 editor.setEditorFontColor(defaultEditorFontColor)
                                 editor.setEditorBackgroundColor(defaultBackgroundColor)
-                                editor.setPlaceholder("insert here")
                                 editor.setInputEnabled(true)
                             }
                             //focus on editor
@@ -276,19 +265,16 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
                             if (setItalicActivated) {
                                 setItalicActivated = false
                                 editor.setItalic()
-                                val ss = editor.html
-                                Log.d("asd",ss)
                             }
                             //insert image
                             if (!insertedImageUri.isNullOrEmpty()) {
-                                editor.insertImage(insertedImageUri, "" )
+                                editor.insertImage(insertedImageUri+"\" style=\\\"width:100%;", "",editor.width )
                                 insertedImageUri = ""
                             }
                             //navigate back to home page
                             if(navToHomePageClicked)
                             {
                                 navToHomePageClicked = false
-                                //it.destroy()
                                 onNavToHomePage()
                             }
                             //save note and back
@@ -296,15 +282,14 @@ fun NoteEditPage(onNavToHomePage:()->Unit,
                             {
                                 onSaveNote = false
                                 val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-                                val md = MessageDigest.getInstance("MD5")
                                 val currentDate = sdf.format(Date())
                                 //create byte array using title + localtime , for example: "Today is so bad 2024-07-29 11:13:59"
-                                md.update("${titleInput} ${currentDate}".toByte())
-                                val md5ID = md.digest().toString()
+                                val md5ID = stringWithMD5("${titleInput} ${currentDate}")
                                 viewModel.updateUiState(
                                     NoteItemDetails(
+                                        id = md5ID,
                                         title = titleInput,
-                                        textHtml = editor.html,
+                                        textHtml = editor.html ?: "",
                                         picture = insertedImagesMap.toMap(),
                                         date = currentDate,
                                 )

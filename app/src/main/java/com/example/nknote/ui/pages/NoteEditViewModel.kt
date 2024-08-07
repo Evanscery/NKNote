@@ -2,6 +2,7 @@ package com.example.nknote.ui.pages
 
 import ItemsRepository
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,7 +29,7 @@ class NoteEditViewModel(private val itemsRepository: ItemsRepository): ViewModel
         itemsRepository.insertItem(noteItemUiState.noteItemDetails.toNoteItem())
     }
 
-    suspend fun deleteById(id:Int) = itemsRepository.deleteById(id)
+    suspend fun deleteById(id:String) = itemsRepository.deleteById(id)
 
 }
 
@@ -36,16 +37,16 @@ data class NoteItemUiState(
     val noteItemDetails : NoteItemDetails = NoteItemDetails(),
     )
 data class NoteItemDetails(
-    val id : Int = 0,
+    val id : String = "id",
     val title : String = "无标题",
     val description : String = "这篇笔记没有描述",
-    val textHtml : String = "",
+    val textHtml : String = "asd",
     val date : String = "",
     val cover : String = "",
     val picture : Map<String,String> = mapOf("" to "")
 )
 
-fun NoteItemDetails.toNoteItem(redundantId : String = ""): NoteItem = NoteItem(
+fun NoteItemDetails.toNoteItem(): NoteItem = NoteItem(
     id = id,
     title = title,
     description = description,

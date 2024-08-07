@@ -13,7 +13,7 @@ interface ItemsRepository {
     /**
      * Retrieve an item from the given data source that matches with the [id].
      */
-    fun getItemStream(id: Int): Flow<NoteItem?>
+    fun getItemStream(id: String): Flow<NoteItem?>
 
     /**
      * Insert item in the data source
@@ -33,7 +33,8 @@ interface ItemsRepository {
     /**
      * Retrieve the json string from the given data source that matches with the [id].
      */
-    suspend fun getPictureString(id : Int):Flow<String?>
+    suspend fun getPictureString(id : String):Flow<String?>
 
-    suspend fun deleteById(id : Int)
+    suspend fun deleteById(id : String)
+
 }

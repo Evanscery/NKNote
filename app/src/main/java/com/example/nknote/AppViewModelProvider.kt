@@ -11,6 +11,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.nknote.ui.pages.MainFrameViewModel
+import com.example.nknote.ui.pages.NoteCheckViewModel
 
 object AppViewModelProvider {
     val Factory = viewModelFactory{
@@ -21,6 +22,11 @@ object AppViewModelProvider {
         // Initializer for MainFrameViewModel
         initializer {
             MainFrameViewModel(inventoryApplication().container.itemsRepository)
+        }
+
+        // Initializer for NoteCheckViewModel
+        initializer {
+            NoteCheckViewModel(this.createSavedStateHandle(),inventoryApplication().container.itemsRepository)
         }
     }
 }
