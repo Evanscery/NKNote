@@ -9,3 +9,6 @@ The target of this project is to provide sufficient, smooth experience of writin
 ### Features to be done:
 > - Cloud storage(base on object storage service by your own netdisk api)
 > - Desktop version
+
+### Simple Demo
+![image](https://github.com/Evanscery/NKNote/blob/master/app/demo/demo_1.gif)
