@@ -1,13 +1,11 @@
 package com.example.nknote.ui.pages
 
-import android.provider.ContactsContract.CommonDataKinds.Note
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,13 +31,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerState
@@ -60,7 +56,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -68,7 +63,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,8 +78,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import com.example.nknote.AppViewModelProvider
 import com.example.nknote.R
 import com.example.nknote.data.NoteItem
@@ -93,9 +87,6 @@ import com.example.nknote.models.entity.DrawerNavigationItem
 import com.example.nknote.ui.theme.NKNoteTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import com.example.nknote.ui.components.SimpleTextField
-import com.example.nknote.ui.navigation.Destinations
-import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -133,7 +124,7 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_update_chs), icon = Icons.Filled.Refresh),
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_explore_chs), icon = Icons.Filled.Face),
                         DrawerNavigationItem(text = stringResource(R.string.homepage_sidebar_recyclebin_chs), icon = Icons.Filled.Delete),
-                        DrawerNavigationItem(text = "随机数",icon = Icons.Filled.Info)
+                        DrawerNavigationItem(text = "随机数",icon = null, iconResourceId = R.drawable.roll)
                     )
 
                     Surface(modifier = Modifier
@@ -173,10 +164,18 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                                     unselectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
                                 ),
                                 icon = {
-                                    Icon(
-                                        drawerNavigationItem.icon,
-                                        contentDescription = drawerNavigationItem.text
-                                    )
+                                    if(drawerNavigationItem.iconResourceId ==0) {
+                                        Icon(
+                                            drawerNavigationItem.icon!!,
+                                            contentDescription = drawerNavigationItem.text
+                                        )
+                                    }
+                                    else{
+                                        Icon(
+                                            ImageBitmap.imageResource(id = drawerNavigationItem.iconResourceId),
+                                            contentDescription = drawerNavigationItem.text
+                                        )
+                                    }
                                 },
 
                                 selected = currentNavigationIndex == index,
@@ -215,7 +214,6 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                     onNavToRandomPage()
             }
             else ->{
-
             }
         }
     }

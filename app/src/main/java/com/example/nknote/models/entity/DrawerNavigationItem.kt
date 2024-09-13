@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 data class DrawerNavigationItem(
         val text : String,
-        val icon : ImageVector
+        val icon : ImageVector? = null,
+        val iconResourceId : Int = 0
 )
 
