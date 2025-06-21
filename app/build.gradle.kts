@@ -73,19 +73,28 @@ dependencies {
     * https://github.com/wasabeef/richeditor-android
      */
     implementation ("jp.wasabeef:richeditor-android:2.0.0")
-    /*
-    * Matisse
-    * Picture picking frame
-    * https://github.com/leavesCZY/Matisse
-     */
-    implementation("io.github.leavesczy:matisse:2.1.0")
 
     //Image loader glide
     val glideComposeVersion = "1.0.0-beta01"
     implementation("com.github.bumptech.glide:compose:$glideComposeVersion")
 
+    /*
+    * Picture picking frame
+    * https://github.com/LuckSiege/PictureSelector/tree/version_component
+     */
+    implementation("io.github.lucksiege:pictureselector:v3.11.2")
+    implementation("io.github.lucksiege:compress:v3.11.2")
+
+    implementation("com.github.stfalcon-studio:StfalconImageViewer:v1.0.1")
+
     //view binding
     implementation ("androidx.compose.ui:ui-viewbinding")
+
+    //FlowRow
+    implementation("com.google.accompanist:accompanist-flowlayout:0.32.0")
+
+    //Date picker
+    implementation("io.github.vanpra.compose-material-dialogs:datetime:0.9.0")
 
     //Room
     val roomVersion = "2.6.1"

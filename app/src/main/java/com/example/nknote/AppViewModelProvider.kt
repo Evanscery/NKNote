@@ -1,35 +1,55 @@
 package com.example.nknote
 
+import android.content.Context
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.CreationExtras
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.nknote.ui.pages.NoteEditViewModel
-import android.app.Application
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
-import androidx.lifecycle.createSavedStateHandle
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.nknote.data.NoteItemRoomDatabase
+import com.example.nknote.data.repository.NoteRepository
+import com.example.nknote.data.repository.NoteRepositoryImpl
 import com.example.nknote.ui.pages.MainFrameViewModel
+import com.example.nknote.ui.pages.NoteEditViewModel
 import com.example.nknote.ui.pages.NoteCheckViewModel
+import com.example.nknote.ui.navigation.Destinations
 
-object AppViewModelProvider {
-    val Factory = viewModelFactory{
-            initializer {
-                NoteEditViewModel(inventoryApplication().container.itemsRepository)
+class AppViewModelProvider(
+    private val noteRepository: NoteRepository,
+    private val savedStateHandle: SavedStateHandle? = null
+) : ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return when {
+            modelClass.isAssignableFrom(MainFrameViewModel::class.java) -> {
+                MainFrameViewModel(noteRepository) as T
             }
+            modelClass.isAssignableFrom(NoteEditViewModel::class.java) -> {
+                NoteEditViewModel(noteRepository) as T
+            }
+            modelClass.isAssignableFrom(NoteCheckViewModel::class.java) -> {
+                val noteId = savedStateHandle?.get<Int>(Destinations.NoteCheckPage.args) ?: 0
+                NoteCheckViewModel(noteId, noteRepository) as T
+            }
+            else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+        }
+    }
 
-        // Initializer for MainFrameViewModel
-        initializer {
-            MainFrameViewModel(inventoryApplication().container.itemsRepository)
+    companion object {
+        fun provide(context: Context): AppViewModelProvider {
+            val database = NoteItemRoomDatabase.getDatabaseObj(context)
+            return AppViewModelProvider(
+                noteRepository = NoteRepositoryImpl(
+                    noteDao = database.noteDao(),
+                    tagDao = database.tagDao(),
+                    noteTagDao = database.noteTagDao(),
+                    imageDao = database.imageDao(),
+                    syncRecordDao = database.syncRecordDao()
+                )
+            )
         }
 
-        // Initializer for NoteCheckViewModel
-        initializer {
-            NoteCheckViewModel(this.createSavedStateHandle(),inventoryApplication().container.itemsRepository)
+        val Factory: (Context) -> ViewModelProvider.Factory = { context ->
+            provide(context)
         }
     }
 }
-
-fun CreationExtras.inventoryApplication(): NKNoteApplication =
-    (this[AndroidViewModelFactory.APPLICATION_KEY] as NKNoteApplication)

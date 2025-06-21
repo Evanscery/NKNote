@@ -11,7 +11,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 object DataHandler {
     @OptIn(ExperimentalEncodingApi::class)
-    fun bitmapToString(bitmap: Bitmap): String? {
+    fun bitmapToString(bitmap: Bitmap): String {
         //将Bitmap转换成字符串
         var string: String? = null
         val bStream = ByteArrayOutputStream()

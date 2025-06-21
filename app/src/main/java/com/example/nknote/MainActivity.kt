@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.NavHost
-import com.example.nknote.ui.components.NKNavHost
+import com.example.nknote.ui.navigation.NKNavHost
 import com.example.nknote.ui.navigation.Destinations
 import com.example.nknote.ui.pages.MainFrame
 import com.example.nknote.ui.pages.NoteEditPage

@@ -44,26 +44,29 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.viewinterop.AndroidViewBinding
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.nknote.AppViewModelProvider
-import com.example.nknote.data.NoteItem
 import com.example.nknote.databinding.NoteRichEditorLayoutBinding
 import com.example.nknote.ui.components.SimpleTextField
 import com.example.nknote.ui.theme.NKNoteTheme
 import jp.wasabeef.richeditor.RichEditor
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.SavedStateHandle
+import com.example.nknote.data.NoteItemRoomDatabase
+import com.example.nknote.data.repository.NoteRepositoryImpl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteCheckPage(
-    viewModel: NoteCheckViewModel = viewModel(factory = AppViewModelProvider.Factory),
-    onNavBack: () -> Unit = {},
-    modifier: Modifier = Modifier
-    ) {
-        val uiState = viewModel.uiState.collectAsState()
-        NoteDetails(
-            noteCheckUiState = uiState.value,
-            onNavBack = onNavBack
-        )
-
-   }
+    onNavBack: () -> Unit,
+    noteId: Int,
+    modifier: Modifier = Modifier,
+    viewModel: NoteCheckViewModel = viewModel(factory = AppViewModelProvider.Factory(LocalContext.current))
+) {
+    val uiState = viewModel.noteUiState.collectAsState()
+    NoteDetails(
+        noteCheckUiState = uiState.value,
+        onNavBack = onNavBack
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,19 +77,17 @@ fun NoteDetails(
     defaultEditorFontSize: Int = 25,
     modifier: Modifier = Modifier,
     onNavBack : ()->Unit = {}
-
 )
 {
     var hasInitialEditor by remember{ mutableStateOf(false)}
     NKNoteTheme {
-        val item = noteCheckUiState.noteItem
         Scaffold(
             modifier = Modifier
                 .fillMaxSize(),
             topBar = {
                 Spacer(modifier = Modifier.statusBarsPadding())
                 CenterAlignedTopAppBar(title = {
-                    Text(text = item.title,
+                    Text(text = noteCheckUiState.title,
                         style = MaterialTheme.typography.titleLarge)
                 },
                     navigationIcon = {
@@ -137,7 +138,7 @@ fun NoteDetails(
                         factory = {
                             context->
                             RichEditor(context).apply{
-                                html = item.textHtml
+                                html = noteCheckUiState.content
                                 setEditorFontSize(defaultEditorFontSize)
                                 setEditorFontColor(defaultEditorFontColor)
                                 setEditorBackgroundColor(defaultBackgroundColor)
@@ -145,7 +146,7 @@ fun NoteDetails(
                             }
                         } ,
                         update = {
-                            it.html = item.textHtml
+                            it.html = noteCheckUiState.content
                         },
                     )
                 }
@@ -155,10 +156,4 @@ fun NoteDetails(
 }
 
 
-
-@Preview
-@Composable
-fun NoteCheckPagePreview() {
-    NoteCheckPage()
-}
 

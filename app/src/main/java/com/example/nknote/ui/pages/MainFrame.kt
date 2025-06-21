@@ -82,13 +82,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.nknote.AppViewModelProvider
 import com.example.nknote.R
-import com.example.nknote.data.NoteItem
+import com.example.nknote.data.entities.Note
 import com.example.nknote.models.entity.DrawerNavigationItem
 import com.example.nknote.ui.theme.NKNoteTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
+import androidx.compose.ui.platform.LocalContext
 
 @Preview("HomePage")
 @Composable
@@ -98,15 +99,18 @@ fun AppPreview() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
-              onNavToNoteCheckPage : (String)->Unit = {},
-              onNavToRandomPage : ()->Unit = {},
-              viewModel: MainFrameViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
+fun MainFrame(
+    onNavToNoteEditPage: () -> Unit = {},
+    onNavToNoteCheckPage: (Int) -> Unit = {},
+    onNavToRandomPage: () -> Unit = {},
+    viewModel: MainFrameViewModel = viewModel(factory = AppViewModelProvider.Factory(LocalContext.current))
+) {
     NKNoteTheme {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         var currentNavigationIndex by remember { mutableStateOf(0) }
-        val mainFrameUiState by viewModel.mainFrameUiState.collectAsState()
+        val notes by viewModel.notes.collectAsState()
+        val tags by viewModel.tags.collectAsState()
         //SideBar
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -167,13 +171,15 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                                     if(drawerNavigationItem.iconResourceId ==0) {
                                         Icon(
                                             drawerNavigationItem.icon!!,
-                                            contentDescription = drawerNavigationItem.text
+                                            contentDescription = drawerNavigationItem.text,
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
                                     else{
                                         Icon(
-                                            ImageBitmap.imageResource(id = drawerNavigationItem.iconResourceId),
-                                            contentDescription = drawerNavigationItem.text
+                                            painter = painterResource(id = drawerNavigationItem.iconResourceId),
+                                            contentDescription = drawerNavigationItem.text,
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
                                 },
@@ -196,22 +202,22 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
                     drawerState = drawerState,
                     onNoteItemClicked = onNavToNoteCheckPage,
                     currentNavigationIndex = currentNavigationIndex,
-                    mainFrameUiState = mainFrameUiState,
+                    notes = notes,
                     onNavClicked = { onNavToNoteEditPage() },
                     onItemDeleteClick = {
                         Log.d("asd","note:$it,should has been deleted")
                         scope.launch {
-                            viewModel.deleteItemById(it)
+                            viewModel.deleteNote(it)
                         }
                     }
-                    )
+                )
             }
         )
         when(currentNavigationIndex)
         {
             4 ->{
-                    currentNavigationIndex = 0
-                    onNavToRandomPage()
+                currentNavigationIndex = 0
+                onNavToRandomPage()
             }
             else ->{
             }
@@ -224,11 +230,11 @@ fun MainFrame(onNavToNoteEditPage : ()->Unit = {},
 fun AppHomePageMainContent(
     scope : CoroutineScope,
     drawerState: DrawerState,
-    onNoteItemClicked: (String) -> Unit = {},
-    onNavClicked: () -> Unit = {},
-    onItemDeleteClick: (String) -> Unit,
+    onNoteItemClicked: (Int) -> Unit,
+    onNavClicked: () -> Unit,
+    onItemDeleteClick: (Int) -> Unit,
     currentNavigationIndex : Int,
-    mainFrameUiState : MainFrameUiState,
+    notes: List<Note>,
     modifier: Modifier = Modifier
 ){
     var searchState by remember { mutableStateOf(false) }
@@ -238,23 +244,23 @@ fun AppHomePageMainContent(
             BackHandler(searchState) {
                 searchState=(!searchState)
             }
-                if(!searchState)
-                {
-                    AppNavigationTopBar(scope = scope,
-                        drawerState = drawerState,
-                        onSearchButtonClick = { searchState=(!searchState) }
-                    )
-                }
-                else
-                {
-                    AppSearchTopBar(
-                        scope = scope,
-                        drawerState = drawerState,
-                        searchTextValue = searchTextValue,
-                        onSearchTextValueChange = {searchTextValue = it},
-                        onSearchButtonClick = { searchState=(!searchState) }
-                    )
-                }
+            if(!searchState)
+            {
+                AppNavigationTopBar(scope = scope,
+                    drawerState = drawerState,
+                    onSearchButtonClick = { searchState=(!searchState) }
+                )
+            }
+            else
+            {
+                AppSearchTopBar(
+                    scope = scope,
+                    drawerState = drawerState,
+                    searchTextValue = searchTextValue,
+                    onSearchTextValueChange = {searchTextValue = it},
+                    onSearchButtonClick = { searchState=(!searchState) }
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -265,15 +271,15 @@ fun AppHomePageMainContent(
             }
         },
         content = {
-                innerPadding ->
+            innerPadding ->
             AppNoteListBody(
-                itemList = mainFrameUiState.itemList,
+                notes = notes,
                 onItemClick = onNoteItemClicked,
                 modifier = modifier.fillMaxSize(),
                 onItemDeleteClick = onItemDeleteClick,
                 contentPadding = innerPadding,
             )
-            }
+        }
     )
 }
 
@@ -384,17 +390,17 @@ fun AppSearchTopBar(
 }
 
 @Composable
-fun AppNoteListBody(itemList: List<NoteItem>,
-                    onItemClick: (String) -> Unit,
-                    onItemDeleteClick: (String) -> Unit,
-                    modifier: Modifier = Modifier,
-                    contentPadding: PaddingValues = PaddingValues(0.dp),)
+fun AppNoteListBody(notes: List<Note>,
+                   onItemClick: (Int) -> Unit,
+                   onItemDeleteClick: (Int) -> Unit,
+                   modifier: Modifier = Modifier,
+                   contentPadding: PaddingValues = PaddingValues(0.dp),)
 {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier,
     ) {
-        if (itemList.isEmpty()) {
+        if (notes.isEmpty()) {
             Text(
                 text = stringResource(R.string.homepage_no_note_description_chs),
                 textAlign = TextAlign.Center,
@@ -403,9 +409,9 @@ fun AppNoteListBody(itemList: List<NoteItem>,
             )
         } else {
             MainFrameNoteList(
-                itemList = itemList,
-                onItemClick = { onItemClick(it.id) },
-                onItemMenuDeleteClick = {onItemDeleteClick(it.id)},
+                notes = notes,
+                onItemClick = onItemClick,
+                onItemMenuDeleteClick = onItemDeleteClick,
                 contentPadding = contentPadding,
                 modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_small))
             )
@@ -415,33 +421,34 @@ fun AppNoteListBody(itemList: List<NoteItem>,
 
 @Composable
 fun MainFrameNoteList(
-    itemList: List<NoteItem>,
-    onItemClick: (NoteItem) -> Unit,
-    onItemMenuDeleteClick: (NoteItem)->Unit,
-    contentPadding: PaddingValues,
-    modifier: Modifier = Modifier
+    notes: List<Note>,
+    onItemClick: (Int) -> Unit,
+    onItemMenuDeleteClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 )
 {
     LazyColumn(
         modifier = modifier,
         contentPadding = contentPadding
     ) {
-        items(items = itemList, key = { it.id } ) { item ->
-            MainFrameNoteItem(item = item,
-                modifier = Modifier
-                    .padding(dimensionResource(id = R.dimen.padding_small)),
-                onItemClick = {onItemClick(item)},
-                onMenuDeleteClick = {onItemMenuDeleteClick(item)})
+        items(items = notes, key = { it.id } ) { note ->
+            MainFrameNoteItem(
+                note = note,
+                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_small)),
+                onItemClick = { onItemClick(note.id) },
+                onMenuDeleteClick = { onItemMenuDeleteClick(note.id) }
+            )
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MainFrameNoteItem(item: NoteItem,
-                      onItemClick: (NoteItem) -> Unit,
-                      onMenuDeleteClick : (NoteItem) ->Unit,
-                      modifier: Modifier = Modifier)
+fun MainFrameNoteItem(note: Note,
+                     onItemClick: (Int) -> Unit,
+                     onMenuDeleteClick : (Int) ->Unit,
+                     modifier: Modifier = Modifier)
 {
     var menuExpanded by remember { mutableStateOf(false)}
     Card(
@@ -455,8 +462,11 @@ fun MainFrameNoteItem(item: NoteItem,
         Box(
             modifier = Modifier.combinedClickable (
                 onLongClick = {menuExpanded=true},
-                onClick = {onItemClick(item)},
-                            )
+                onClick = {
+                    Log.d("Navigation", "Clicking note with id: ${note.id}")
+                    onItemClick(note.id)
+                },
+            )
         ){
             Column(
                 modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large)),
@@ -466,17 +476,17 @@ fun MainFrameNoteItem(item: NoteItem,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = item.title,
+                        text = note.title,
                         style = MaterialTheme.typography.titleLarge,
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
-                        text = item.date,
+                        text = note.date,
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
                 Text(
-                    text = item.description,
+                    text = note.description,
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -484,11 +494,9 @@ fun MainFrameNoteItem(item: NoteItem,
         noteFloatingMenu(
             menuExpanded = menuExpanded,
             onMenuExpandedStateChange = { menuExpanded = !menuExpanded },
-            onMenuDeleteClick = {onMenuDeleteClick(item)})
-        }
+            onMenuDeleteClick = {onMenuDeleteClick(note.id)})
     }
-
-
+}
 
 @Composable
 fun noteFloatingMenu(

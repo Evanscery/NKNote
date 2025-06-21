@@ -1,42 +1,71 @@
 package com.example.nknote.ui.pages
 
-import ItemsRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.nknote.data.NoteItem
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
+import com.example.nknote.data.entities.Note
+import com.example.nknote.data.entities.Tag
+import com.example.nknote.data.repository.NoteRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel to retrieve all items in the Room database.
  */
-class MainFrameViewModel(private val itemsRepository: ItemsRepository) : ViewModel() {
-    /**
-     * Holds main frame ui state. The list of items are retrieved from [ItemsRepository] and mapped to
-     * [MainFrameUiState]
-     */
-    val mainFrameUiState: StateFlow<MainFrameUiState> =
-        itemsRepository.getAllItemsStream().map{ MainFrameUiState(it)}
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(TIMEOUT_MILLIS),
-                initialValue = MainFrameUiState()
-            )
-    suspend fun getItem(id:String) : Flow<NoteItem?> {
-        return itemsRepository.getItemStream(id)
+class MainFrameViewModel(
+    private val noteRepository: NoteRepository
+) : ViewModel() {
+    private val _notes = MutableStateFlow<List<Note>>(emptyList())
+    val notes: StateFlow<List<Note>> = _notes.asStateFlow()
+
+    private val _tags = MutableStateFlow<List<Tag>>(emptyList())
+    val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            noteRepository.getAllNotes().collect { noteList ->
+                _notes.value = noteList
+            }
+        }
+
+        viewModelScope.launch {
+            noteRepository.getAllTags().collect { tagList ->
+                _tags.value = tagList
+            }
+        }
     }
 
-    suspend fun deleteItemById(id : String) = itemsRepository.deleteById(id)
+    suspend fun deleteNote(id: Int) {
+        noteRepository.deleteNoteById(id)
+    }
 
-    companion object {
-        private const val TIMEOUT_MILLIS = 5_000L
+    suspend fun searchNotes(query: String) {
+        viewModelScope.launch {
+            noteRepository.searchNotes(query).collect { noteList ->
+                _notes.value = noteList
+            }
+        }
+    }
+
+    suspend fun getNotesByTag(tagId: String) {
+        viewModelScope.launch {
+            noteRepository.getNotesForTag(tagId).collect { noteList ->
+                _notes.value = noteList
+            }
+        }
+    }
+
+    suspend fun refreshNotes() {
+        viewModelScope.launch {
+            noteRepository.getAllNotes().collect { noteList ->
+                _notes.value = noteList
+            }
+        }
     }
 }
 
 /**
  * Ui State for HomeScreen
  */
-data class MainFrameUiState(val itemList: List<NoteItem> = listOf())
+data class MainFrameUiState(val itemList: List<Note> = listOf())
