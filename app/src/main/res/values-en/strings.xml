@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NKNote</string>
+
+    <!-- Navigation drawer -->
+    <string name="nav_home">Home</string>
+    <string name="nav_explore">Explore</string>
+    <string name="nav_random">Random</string>
+    <string name="nav_trash">Trash</string>
+    <string name="nav_settings">Settings</string>
+    <string name="drawer_greeting">Hello, how was your day?</string>
+
+    <!-- Home -->
+    <string name="home_title">Diary</string>
+    <string name="home_search_placeholder">Search notes…</string>
+    <string name="home_empty">No notes yet. Tap the button below to write one.</string>
+    <string name="home_search_empty">No matching notes</string>
+    <string name="home_delete">Move to trash</string>
+    <string name="home_today">Today</string>
+    <string name="home_this_day">On this day · %1$s</string>
+
+    <!-- Editor -->
+    <string name="editor_title_placeholder">Title</string>
+    <string name="editor_description">Summary</string>
+    <string name="editor_description_placeholder">One line to describe this note</string>
+    <string name="editor_tags">Tags</string>
+    <string name="editor_tag_input_placeholder">Type a tag and press enter</string>
+    <string name="editor_select_date">Select date</string>
+    <string name="editor_select_weather">Weather</string>
+    <string name="editor_select_mood">Mood</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_back_confirm">Discard unsaved changes and go back?</string>
+    <string name="editor_confirm">Discard</string>
+    <string name="editor_cancel">Cancel</string>
+    <string name="editor_content_placeholder">Start writing…</string>
+    <string name="editor_format_bold">Bold</string>
+    <string name="editor_format_italic">Italic</string>
+    <string name="editor_format_underline">Underline</string>
+    <string name="editor_format_strikethrough">Strikethrough</string>
+    <string name="editor_format_color">Color</string>
+    <string name="editor_format_size">Font size</string>
+    <string name="editor_format_heading">Heading</string>
+    <string name="editor_format_quote">Quote</string>
+    <string name="editor_format_bullet">List</string>
+    <string name="editor_insert_image">Insert image</string>
+    <string name="editor_no_image_selected">No image selected</string>
+    <string name="editor_custom_color">Custom color</string>
+    <string name="editor_select_color">Pick a color</string>
+
+    <!-- Viewer -->
+    <string name="viewer_title">Image preview</string>
+    <string name="viewer_delete">Delete image</string>
+    <string name="viewer_delete_confirm">Delete this image?</string>
+
+    <!-- Trash -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty">Trash is empty</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_delete_forever">Delete forever</string>
+    <string name="trash_clear_all">Empty trash</string>
+    <string name="trash_clear_all_confirm">Empty the trash? This cannot be undone.</string>
+    <string name="trash_clear">Empty</string>
+    <string name="trash_cancel">Cancel</string>
+
+    <!-- Random -->
+    <string name="random_title">Random pick</string>
+    <string name="random_result">Result: %1$s</string>
+    <string name="random_input_placeholder">Enter options, one per line</string>
+    <string name="random_start">Pick</string>
+    <string name="random_clear">Clear</string>
+
+    <!-- Explore -->
+    <string name="explore_title">Explore</string>
+    <string name="explore_on_this_day">On this day, other years</string>
+    <string name="explore_this_day_empty">No notes from this day in past years</string>
+    <string name="explore_dates_written">%1$d notes written</string>
+    <string name="explore_no_notes">No notes to explore yet</string>
+
+    <!-- Import -->
+    <string name="import_title">Import</string>
+    <string name="import_pick_file">Pick a file</string>
+    <string name="import_hint">Supports .txt files; auto-parsed into notes</string>
+    <string name="import_success">Import succeeded</string>
+    <string name="import_failed">Import failed: %1$s</string>
+    <string name="import_progress">Parsing…</string>
+
+    <!-- Common -->
+    <string name="common_back">Back</string>
+    <string name="common_close">Close</string>
+    <string name="common_confirm">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_none">None</string>
+    <string name="common_save">Save</string>
+    <string name="common_no_title">Untitled</string>
+    <string name="common_no_description">No summary for this note</string>
+
+    <!-- Weather -->
+    <string name="weather_sunny">Sunny</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_overcast">Overcast</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_storm">Storm</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_windy">Windy</string>
+    <string name="weather_hot">Hot</string>
+
+    <!-- Mood -->
+    <string name="mood_ecstatic">Ecstatic</string>
+    <string name="mood_happy">Happy</string>
+    <string name="mood_neutral">Neutral</string>
+    <string name="mood_sad">Sad</string>
+    <string name="mood_awful">Awful</string>
+    <string name="mood_angry">Angry</string>
+    <string name="mood_calm">Calm</string>
+</resources>

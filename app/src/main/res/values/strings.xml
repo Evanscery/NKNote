@@ -1,12 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NKNote</string>
-    <string name="title_activity_main_frame">MainFrame</string>
-    <string name="homepage_sidebar_explore_chs">探索</string>
-    <string name="notepage_topbar_title_default_chs">标题</string>
-    <string name="notepage_topbar_title_placerholder_chs">请输入标题</string>
-    <string name="note_default_title_chs">无标题</string>
-    <string name="note_default_description_chs">这篇笔记没有描述</string>
-    <string name="note_rich_text_editor_placeholder_chs">输入内容</string>
-    <string name="homepage_no_note_description_chs">不存在日记</string>
-    <string name="homepage_noteitem_menu_delete_chs">删除</string>
+
+    <!-- Navigation drawer -->
+    <string name="nav_home">首页</string>
+    <string name="nav_explore">探索</string>
+    <string name="nav_random">随机抽取</string>
+    <string name="nav_trash">回收站</string>
+    <string name="nav_settings">设置</string>
+    <string name="drawer_greeting">你好，今天过得怎么样？</string>
+
+    <!-- Home -->
+    <string name="home_title">日记</string>
+    <string name="home_search_placeholder">搜索日记…</string>
+    <string name="home_empty">还没有日记，点击右下角写一篇吧</string>
+    <string name="home_search_empty">没有匹配的日记</string>
+    <string name="home_delete">移入回收站</string>
+    <string name="home_today">今天</string>
+    <string name="home_this_day">去年今日 · %1$s</string>
+
+    <!-- Editor -->
+    <string name="editor_title_placeholder">标题</string>
+    <string name="editor_description">简介</string>
+    <string name="editor_description_placeholder">一句话描述这篇日记</string>
+    <string name="editor_tags">标签</string>
+    <string name="editor_tag_input_placeholder">输入标签后回车添加</string>
+    <string name="editor_select_date">选择日期</string>
+    <string name="editor_select_weather">天气</string>
+    <string name="editor_select_mood">心情</string>
+    <string name="editor_save">保存</string>
+    <string name="editor_back_confirm">未保存的更改将丢失，确认返回？</string>
+    <string name="editor_confirm">确认</string>
+    <string name="editor_cancel">取消</string>
+    <string name="editor_content_placeholder">开始写点什么…</string>
+    <string name="editor_format_bold">加粗</string>
+    <string name="editor_format_italic">斜体</string>
+    <string name="editor_format_underline">下划线</string>
+    <string name="editor_format_strikethrough">删除线</string>
+    <string name="editor_format_color">颜色</string>
+    <string name="editor_format_size">字号</string>
+    <string name="editor_format_heading">标题</string>
+    <string name="editor_format_quote">引用</string>
+    <string name="editor_format_bullet">列表</string>
+    <string name="editor_insert_image">插入图片</string>
+    <string name="editor_no_image_selected">未选择图片</string>
+    <string name="editor_custom_color">自定义颜色</string>
+    <string name="editor_select_color">选择颜色</string>
+
+    <!-- Viewer -->
+    <string name="viewer_title">图片预览</string>
+    <string name="viewer_delete">删除图片</string>
+    <string name="viewer_delete_confirm">确定删除这张图片吗？</string>
+
+    <!-- Trash -->
+    <string name="trash_title">回收站</string>
+    <string name="trash_empty">回收站为空</string>
+    <string name="trash_restore">恢复</string>
+    <string name="trash_delete_forever">永久删除</string>
+    <string name="trash_clear_all">清空回收站</string>
+    <string name="trash_clear_all_confirm">确定清空回收站吗？此操作不可撤销。</string>
+    <string name="trash_clear">清空</string>
+    <string name="trash_cancel">取消</string>
+
+    <!-- Random -->
+    <string name="random_title">随机抽取</string>
+    <string name="random_result">结果：%1$s</string>
+    <string name="random_input_placeholder">输入选项，每行一个</string>
+    <string name="random_start">开始抽取</string>
+    <string name="random_clear">清空</string>
+
+    <!-- Explore -->
+    <string name="explore_title">探索</string>
+    <string name="explore_on_this_day">往年的今天</string>
+    <string name="explore_this_day_empty">没有往年的今日记录</string>
+    <string name="explore_dates_written">已记录 %1$d 篇日记</string>
+    <string name="explore_no_notes">还没有日记可探索</string>
+
+    <!-- Import -->
+    <string name="import_title">导入</string>
+    <string name="import_pick_file">选择文件</string>
+    <string name="import_hint">支持 .txt 文件，将自动解析为日记</string>
+    <string name="import_success">导入成功</string>
+    <string name="import_failed">导入失败：%1$s</string>
+    <string name="import_progress">正在解析…</string>
+
+    <!-- Common -->
+    <string name="common_back">返回</string>
+    <string name="common_close">关闭</string>
+    <string name="common_confirm">确定</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_none">无</string>
+    <string name="common_save">保存</string>
+    <string name="common_no_title">无标题</string>
+    <string name="common_no_description">这篇日记没有描述</string>
+
+    <!-- Weather -->
+    <string name="weather_sunny">晴</string>
+    <string name="weather_cloudy">多云</string>
+    <string name="weather_overcast">阴</string>
+    <string name="weather_rain">雨</string>
+    <string name="weather_snow">雪</string>
+    <string name="weather_storm">雷暴</string>
+    <string name="weather_fog">雾</string>
+    <string name="weather_windy">大风</string>
+    <string name="weather_hot">酷热</string>
+
+    <!-- Mood -->
+    <string name="mood_ecstatic">狂喜</string>
+    <string name="mood_happy">开心</string>
+    <string name="mood_neutral">平静</string>
+    <string name="mood_sad">难过</string>
+    <string name="mood_awful">糟糕</string>
+    <string name="mood_angry">生气</string>
+    <string name="mood_calm">从容</string>
 </resources>
