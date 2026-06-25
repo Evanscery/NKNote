@@ -18,6 +18,7 @@ import io.github.nknote.model.RichDocument
 import io.github.nknote.ui.editor.richtext.EditorDocument
 import io.github.nknote.ui.editor.richtext.EditorParagraph
 import io.github.nknote.ui.editor.richtext.afterTextChange
+import io.github.nknote.ui.editor.richtext.merge
 import io.github.nknote.ui.editor.richtext.setColor
 import io.github.nknote.ui.editor.richtext.setFontSizeScale
 import io.github.nknote.ui.editor.richtext.splitAt
@@ -57,6 +58,10 @@ class EditorViewModel(
     var focusedIndex by mutableStateOf(0)
         private set
 
+    /** When set, the EditorPage requests focus on the paragraph at this index. */
+    var pendingFocusIndex by mutableStateOf(-1)
+        private set
+
     var loaded by mutableStateOf(noteId == null || noteId <= 0)
         private set
 
@@ -83,7 +88,6 @@ class EditorViewModel(
         launch { repo.observeTagsForNote(id).collect { ts -> tagNames.clear(); tagNames.addAll(ts.map { it.name }) } }
     }
 
-    // ── Title / meta ──────────────────────────────────────────────
     fun updateTitle(v: String) { title = v }
     fun updateDescription(v: String) { description = v }
     fun updateDate(v: String) { date = v }
@@ -96,14 +100,10 @@ class EditorViewModel(
     }
     fun removeTag(name: String) { tagNames.remove(name) }
 
-    // ── Paragraph editing ─────────────────────────────────────────
     fun onFocus(index: Int) { focusedIndex = index }
 
     fun onTextChange(index: Int, newValue: TextFieldValue) {
-        if (index !in document.paragraphs.indices) {
-            // out-of-range safety: append a paragraph
-            ensureCapacity(index + 1)
-        }
+        if (index !in document.paragraphs.indices) ensureCapacity(index + 1)
         val para = document.paragraphs[index]
         val updated = para.afterTextChange(newValue.text)
         updateParagraph(index, updated)
@@ -111,18 +111,54 @@ class EditorViewModel(
     }
 
     /**
-     * Split [index] into two paragraphs: one holding [beforeText], a new one after holding [afterText].
-     * Called by the editor on Enter (newline). [para.text] must equal [beforeText] + [afterText].
+     * Split paragraph [index] at the newline. [beforeText] is the text before \n,
+     * [afterText] is the text after. Requests focus on the new paragraph.
      */
     fun splitParagraph(index: Int, beforeText: String, afterText: String) {
         val para = document.paragraphs.getOrNull(index) ?: return
-        val (before, after) = para.splitAt(beforeText.length)
+        val splitPoint = beforeText.length.coerceIn(0, para.text.length)
+        val (before, after) = para.splitAt(splitPoint)
         updateParagraph(index, before)
         insertParagraphAfter(index, after)
         fields[index] = TextFieldValue(before.text, TextRange(before.text.length))
-        fields.add(index + 1, TextFieldValue(after.text, TextRange(0)))
+        fields.add(index + 1, TextFieldValue(after.text, TextRange(after.text.length.coerceAtLeast(0))))
         focusedIndex = index + 1
+        pendingFocusIndex = index + 1
     }
+
+    /**
+     * Merge paragraph [index] into the previous paragraph (backspace at start).
+     * Requests focus on the merged paragraph with cursor at the join point.
+     */
+    fun mergeWithPrevious(index: Int) {
+        if (index <= 0) return
+        val prev = document.paragraphs[index - 1]
+        val cur = document.paragraphs[index]
+        if (cur.image != null) {
+            // image paragraph: just remove it, keep focus on previous
+            removeImageParagraph(index)
+            focusedIndex = index - 1
+            pendingFocusIndex = index - 1
+            return
+        }
+        if (prev.image != null) {
+            // previous is image: merge skips it, focus on the text paragraph before it
+            // simplest: just remove the image paragraph, stay on current
+            removeImageParagraph(index - 1)
+            focusedIndex = index - 1
+            pendingFocusIndex = index - 1
+            return
+        }
+        val joinCursor = prev.text.length
+        val merged = prev.merge(cur)
+        updateParagraph(index - 1, merged)
+        removeParagraphInternal(index)
+        fields[index - 1] = TextFieldValue(merged.text, TextRange(joinCursor))
+        focusedIndex = index - 1
+        pendingFocusIndex = index - 1
+    }
+
+    fun consumePendingFocus() { pendingFocusIndex = -1 }
 
     fun setParagraphStyle(index: Int, style: ParagraphStyle) {
         if (index in document.paragraphs.indices) {
@@ -154,9 +190,8 @@ class EditorViewModel(
         updateParagraph(i, updated)
     }
 
-    // ── Images ────────────────────────────────────────────────────
     fun insertImageAfter(index: Int, sourceUri: android.net.Uri) {
-        val targetNoteId = noteId ?: -1 // for new notes, store under temp dir then re-link on save
+        val targetNoteId = noteId ?: -1
         val path = imageStore.saveForNote(if (targetNoteId <= 0) 0 else targetNoteId, sourceUri) ?: return
         val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         android.graphics.BitmapFactory.decodeFile(path, opts)
@@ -164,6 +199,7 @@ class EditorViewModel(
         insertParagraphAfter(index.coerceAtMost(document.size - 1), EditorParagraph(image = img))
         fields.add((index + 1).coerceAtMost(fields.size), TextFieldValue(""))
         focusedIndex = index + 1
+        pendingFocusIndex = index + 1
     }
 
     fun removeImageParagraph(index: Int) {
@@ -171,7 +207,6 @@ class EditorViewModel(
         removeParagraphInternal(index)
     }
 
-    // ── Save ──────────────────────────────────────────────────────
     fun save(onDone: () -> Unit) = viewModelScope.launch {
         val now = System.currentTimeMillis()
         val model = document.toModel()
@@ -206,7 +241,6 @@ class EditorViewModel(
         repo.setNoteTags(noteId, ids)
     }
 
-    // ── Internal mutation helpers ─────────────────────────────────
     private fun updateParagraph(index: Int, paragraph: EditorParagraph) {
         val list = document.paragraphs.toMutableList()
         list[index] = paragraph
@@ -218,7 +252,7 @@ class EditorViewModel(
         document = document.copy(paragraphs = list)
     }
     private fun removeParagraphInternal(index: Int) {
-        if (document.size <= 1) { // keep at least one
+        if (document.size <= 1) {
             updateParagraph(0, EditorParagraph()); fields[0] = TextFieldValue(""); return
         }
         val list = document.paragraphs.toMutableList()

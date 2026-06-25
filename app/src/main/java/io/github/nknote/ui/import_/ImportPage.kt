@@ -59,7 +59,13 @@ fun ImportPage(nav: NkNoteNavigation) {
                 runCatching {
                     val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
                         ?: error("Cannot read file")
-                    val name = uri.lastPathSegment ?: "imported.txt"
+                    // Extract a usable filename from the URI
+                    val name = runCatching {
+                        val cursor = context.contentResolver.query(uri, null, null, null, null)
+                        cursor?.use { c ->
+                            if (c.moveToFirst()) c.getString(c.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME)) else null
+                        } ?: "imported.txt"
+                    }.getOrDefault("imported.txt")
                     val note = TextImporter.parse(name, text)
                     context.appContainer().noteRepository.insertNote(note)
                     context.getString(R.string.import_success)

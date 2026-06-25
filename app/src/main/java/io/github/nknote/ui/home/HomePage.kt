@@ -16,15 +16,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +65,7 @@ import kotlinx.serialization.json.Json
 
 private val documentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomePage(
     nav: NkNoteNavigation,
@@ -77,16 +80,16 @@ fun HomePage(
             items = listOf(
                 NkDrawerItem(stringResource(R.string.nav_home), Icons.Filled.Tune),
                 NkDrawerItem(stringResource(R.string.nav_explore), Icons.Filled.Explore),
-                NkDrawerItem(stringResource(R.string.nav_random), Icons.Filled.Casino),
                 NkDrawerItem(stringResource(R.string.nav_trash), Icons.Filled.DeleteOutline),
-                NkDrawerItem(stringResource(R.string.import_title), Icons.Filled.FileUpload)
+                NkDrawerItem(stringResource(R.string.tools_title), Icons.Filled.Build),
+                NkDrawerItem(stringResource(R.string.nav_settings), Icons.Filled.Settings)
             ),
             onSelect = { index ->
                 when (index) {
                     1 -> nav.toExplore()
-                    2 -> nav.toRandom()
-                    3 -> nav.toTrash()
-                    4 -> nav.toImport()
+                    2 -> nav.toTrash()
+                    3 -> nav.toTools()
+                    4 -> nav.toSettings()
                 }
             },
             content = { drawerToggle ->
@@ -97,7 +100,9 @@ fun HomePage(
                     onNewNote = { nav.toEditor(null) },
                     onOpenNote = openNote,
                     onTrash = { viewModel.moveToTrash(it) },
-                    onOpenMenu = drawerToggle
+                    onOpenMenu = drawerToggle,
+                    onToggleMode = { viewModel.toggleMode() },
+                    modeLabel = stringResource(if (viewModel.mode == HomeViewModel.ViewMode.ALL) R.string.home_today else R.string.home_all)
                 )
             }
         )
@@ -112,10 +117,12 @@ private fun HomeContent(
     onNewNote: () -> Unit,
     onOpenNote: (Int) -> Unit,
     onTrash: (Int) -> Unit,
-    onOpenMenu: () -> Unit
+    onOpenMenu: () -> Unit,
+    onToggleMode: () -> Unit,
+    modeLabel: String
 ) {
     Scaffold(
-        topBar = { HomeTopBar(query = query, onQueryChange = onQueryChange, onOpenMenu = onOpenMenu) },
+        topBar = { HomeTopBar(query = query, onQueryChange = onQueryChange, onOpenMenu = onOpenMenu, onToggleMode = onToggleMode, modeLabel = modeLabel) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNewNote,
@@ -153,7 +160,13 @@ private fun HomeContent(
 }
 
 @Composable
-private fun HomeTopBar(query: String, onQueryChange: (String) -> Unit, onOpenMenu: () -> Unit) {
+private fun HomeTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onOpenMenu: () -> Unit,
+    onToggleMode: () -> Unit,
+    modeLabel: String
+) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -165,7 +178,13 @@ private fun HomeTopBar(query: String, onQueryChange: (String) -> Unit, onOpenMen
                     modifier = Modifier.padding(start = 4.dp)
                 )
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.AutoAwesome, null) }
+                // View-mode toggle (All ↔ Today) — replaces the meaningless button
+                FilterChip(
+                    selected = false,
+                    onClick = onToggleMode,
+                    label = { Text(modeLabel, style = MaterialTheme.typography.labelMedium) },
+                    leadingIcon = { Icon(Icons.Filled.CalendarMonth, null, modifier = Modifier.size(16.dp)) }
+                )
             }
             TextField(
                 value = query,

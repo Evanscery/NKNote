@@ -15,10 +15,11 @@ import kotlinx.coroutines.launch
 class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
 
     private val query = MutableStateFlow("")
-    private val mode = MutableStateFlow(ViewMode.ALL)
+    private val _mode = MutableStateFlow(ViewMode.ALL)
+    val mode: ViewMode get() = _mode.value
 
     val notes: StateFlow<List<Note>> =
-        combine(repo.observeAllNotes(), mode, query) { all, m, q ->
+        combine(repo.observeAllNotes(), _mode, query) { all, m, q ->
             val byMode = when (m) {
                 ViewMode.ALL -> all
                 ViewMode.TODAY -> all.filter { it.date == todayStr() }
@@ -40,16 +41,19 @@ class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
     }
 
     fun setQuery(q: String) { query.value = q }
-    fun setMode(m: ViewMode) { mode.value = m }
+    fun toggleMode() { _mode.value = if (_mode.value == ViewMode.ALL) ViewMode.TODAY else ViewMode.ALL }
 
     fun moveToTrash(id: Int) = viewModelScope.launch { repo.moveToTrash(id) }
 
     private fun matchesQuery(note: Note, q: String): Boolean {
         val needle = q.trim()
         if (needle.isEmpty()) return true
-        return note.title.contains(needle, true) ||
-            note.description.contains(needle, true) ||
-            note.content.contains(needle, true)
+        if (note.title.contains(needle, true) || note.description.contains(needle, true)) return true
+        // Search the plain text of the RichDocument, not raw JSON
+        val plain = runCatching {
+            kotlinx.serialization.json.Json.decodeFromString<io.github.nknote.model.RichDocument>(note.content).plainText()
+        }.getOrNull().orEmpty()
+        return plain.contains(needle, true)
     }
 
     enum class ViewMode { ALL, TODAY }

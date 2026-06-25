@@ -12,6 +12,8 @@ import io.github.nknote.ui.explore.ExplorePage
 import io.github.nknote.ui.home.HomePage
 import io.github.nknote.ui.import_.ImportPage
 import io.github.nknote.ui.random.RandomPage
+import io.github.nknote.ui.settings.SettingsPage
+import io.github.nknote.ui.tools.ToolsPage
 import io.github.nknote.ui.trash.TrashPage
 import io.github.nknote.ui.viewer.ImageViewerPage
 import java.net.URLEncoder
@@ -28,8 +30,10 @@ fun NkNoteApp() {
                 navController.navigate("viewer/$encoded")
             },
             toTrash = { navController.navigate(Destination.Trash.route) },
-            toRandom = { navController.navigate(Destination.Random.route) },
             toExplore = { navController.navigate(Destination.Explore.route) },
+            toTools = { navController.navigate(Destination.Tools.route) },
+            toRandom = { navController.navigate(Destination.Random.route) },
+            toSettings = { navController.navigate(Destination.Settings.route) },
             toImport = { navController.navigate(Destination.Import.route) },
             toHomeAndClear = {
                 navController.navigate(Destination.Home.route) {
@@ -42,10 +46,7 @@ fun NkNoteApp() {
 
     NavHost(navController = navController, startDestination = Destination.Home.route) {
         composable(Destination.Home.route) {
-            HomePage(
-                nav = nav,
-                openNote = { id -> nav.toEditor(id) }
-            )
+            HomePage(nav = nav, openNote = { id -> nav.toEditor(id) })
         }
         composable(
             route = Destination.Editor.routeWithArg,
@@ -54,10 +55,7 @@ fun NkNoteApp() {
             })
         ) { backStack ->
             val noteId = backStack.arguments?.getInt(Destination.Editor.ARG_NOTE_ID) ?: -1
-            EditorPage(
-                noteId = if (noteId <= 0) null else noteId,
-                nav = nav
-            )
+            EditorPage(noteId = if (noteId <= 0) null else noteId, nav = nav)
         }
         composable(
             route = Destination.Viewer.routeWithArg,
@@ -68,8 +66,10 @@ fun NkNoteApp() {
             ImageViewerPage(imagePath = path, nav = nav)
         }
         composable(Destination.Trash.route) { TrashPage(nav = nav) }
-        composable(Destination.Random.route) { RandomPage(nav = nav) }
         composable(Destination.Explore.route) { ExplorePage(nav = nav, openNote = { nav.toEditor(it) }) }
+        composable(Destination.Tools.route) { ToolsPage(nav = nav) }
+        composable(Destination.Random.route) { RandomPage(nav = nav) }
+        composable(Destination.Settings.route) { SettingsPage(nav = nav) }
         composable(Destination.Import.route) { ImportPage(nav = nav) }
     }
 }

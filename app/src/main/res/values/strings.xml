@@ -10,6 +10,16 @@
     <string name="nav_settings">设置</string>
     <string name="drawer_greeting">你好，今天过得怎么样？</string>
 
+    <!-- Tools -->
+    <string name="tools_title">工具箱</string>
+    <string name="tools_section_utilities">实用工具</string>
+    <string name="random_subtitle">从多个选项中随机抽取一个</string>
+
+    <!-- Settings -->
+    <string name="settings_section_data">数据</string>
+    <string name="settings_section_about">关于</string>
+    <string name="home_all">全部</string>
+
     <!-- Home -->
     <string name="home_title">日记</string>
     <string name="home_search_placeholder">搜索日记…</string>
