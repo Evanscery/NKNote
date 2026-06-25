@@ -174,6 +174,18 @@ class EditorViewModel(
 
     fun consumePendingFocus() { pendingFocusIndex = -1 }
 
+    /** Focus the last text paragraph (or first paragraph if all are images). Used when tapping blank space. */
+    fun focusLastTextParagraph() {
+        val lastTextIndex = document.paragraphs.indices.reversed().firstOrNull {
+            document.paragraphs[it].image == null
+        } ?: 0
+        // Place cursor at end of the text
+        val text = fields.getOrNull(lastTextIndex)?.text ?: ""
+        fields[lastTextIndex] = TextFieldValue(text, TextRange(text.length))
+        focusedIndex = lastTextIndex
+        pendingFocusIndex = lastTextIndex
+    }
+
     fun setParagraphStyle(index: Int, style: ParagraphStyle) {
         if (index in document.paragraphs.indices) {
             updateParagraph(index, document.paragraphs[index].copy(style = style))
@@ -210,10 +222,16 @@ class EditorViewModel(
         val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         android.graphics.BitmapFactory.decodeFile(path, opts)
         val img = InlineImage(path, opts.outWidth.coerceAtLeast(1), opts.outHeight.coerceAtLeast(1))
-        insertParagraphAfter(index.coerceAtMost(document.size - 1), EditorParagraph(image = img))
-        fields.add((index + 1).coerceAtMost(fields.size), TextFieldValue(""))
-        focusedIndex = index + 1
-        pendingFocusIndex = index + 1
+        val insertAt = index.coerceAtMost(document.size - 1)
+        // Insert image paragraph
+        insertParagraphAfter(insertAt, EditorParagraph(image = img))
+        fields.add((insertAt + 1).coerceAtMost(fields.size), TextFieldValue(""))
+        // Auto-insert an empty text paragraph after the image so the user can continue typing
+        insertParagraphAfter(insertAt + 1, EditorParagraph())
+        fields.add((insertAt + 2).coerceAtMost(fields.size), TextFieldValue(""))
+        // Focus the text paragraph after the image
+        focusedIndex = insertAt + 2
+        pendingFocusIndex = insertAt + 2
     }
 
     fun removeImageParagraph(index: Int) {

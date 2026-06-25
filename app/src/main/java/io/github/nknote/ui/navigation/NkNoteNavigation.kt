@@ -7,6 +7,7 @@ class NkNoteNavigation(
     val toViewer: (String) -> Unit,
     val toTrash: () -> Unit,
     val toExplore: () -> Unit,
+    val toCalendar: () -> Unit,
     val toTools: () -> Unit,
     val toRandom: () -> Unit,
     val toSettings: () -> Unit,

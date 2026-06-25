@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -101,8 +100,7 @@ fun HomePage(
                     onOpenNote = openNote,
                     onTrash = { viewModel.moveToTrash(it) },
                     onOpenMenu = drawerToggle,
-                    onToggleMode = { viewModel.toggleMode() },
-                    modeLabel = stringResource(if (viewModel.mode == HomeViewModel.ViewMode.ALL) R.string.home_today else R.string.home_all)
+                    onOpenCalendar = { nav.toCalendar() }
                 )
             }
         )
@@ -118,11 +116,10 @@ private fun HomeContent(
     onOpenNote: (Int) -> Unit,
     onTrash: (Int) -> Unit,
     onOpenMenu: () -> Unit,
-    onToggleMode: () -> Unit,
-    modeLabel: String
+    onOpenCalendar: () -> Unit
 ) {
     Scaffold(
-        topBar = { HomeTopBar(query = query, onQueryChange = onQueryChange, onOpenMenu = onOpenMenu, onToggleMode = onToggleMode, modeLabel = modeLabel) },
+        topBar = { HomeTopBar(query = query, onQueryChange = onQueryChange, onOpenMenu = onOpenMenu, onOpenCalendar = onOpenCalendar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNewNote,
@@ -164,8 +161,7 @@ private fun HomeTopBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onOpenMenu: () -> Unit,
-    onToggleMode: () -> Unit,
-    modeLabel: String
+    onOpenCalendar: () -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
@@ -178,13 +174,10 @@ private fun HomeTopBar(
                     modifier = Modifier.padding(start = 4.dp)
                 )
                 Spacer(Modifier.weight(1f))
-                // View-mode toggle (All ↔ Today) — replaces the meaningless button
-                FilterChip(
-                    selected = false,
-                    onClick = onToggleMode,
-                    label = { Text(modeLabel, style = MaterialTheme.typography.labelMedium) },
-                    leadingIcon = { Icon(Icons.Filled.CalendarMonth, null, modifier = Modifier.size(16.dp)) }
-                )
+                // Issue 2: calendar button opens calendar view showing days with notes
+                IconButton(onClick = onOpenCalendar) {
+                    Icon(Icons.Filled.CalendarMonth, stringResource(R.string.calendar_title), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             TextField(
                 value = query,

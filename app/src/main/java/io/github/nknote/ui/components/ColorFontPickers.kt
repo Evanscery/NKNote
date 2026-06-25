@@ -15,14 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -53,40 +51,53 @@ fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
     val rgb = Color(red, green, blue)
     customHex = toHex(rgb)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = { onPick(customHex) }) { Text(stringResource(R.string.common_confirm)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
-        title = { Text(stringResource(R.string.editor_select_color)) },
-        text = {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PALETTE.forEach { hex ->
-                        val c = parseHexColor(hex) ?: Color.Black
-                        Box(
-                            Modifier.size(34.dp).background(c, CircleShape).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                                .clickable { onPick(hex); }
-                        )
-                    }
+    NkDialog(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.editor_select_color),
+        confirmText = stringResource(R.string.common_confirm),
+        onConfirm = { onPick(customHex) },
+        dismissText = stringResource(R.string.common_cancel)
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PALETTE.forEach { hex ->
+                    val c = parseHexColor(hex) ?: Color.Black
+                    Box(
+                        Modifier.size(34.dp)
+                            .background(c, CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .clickable { onPick(hex) }
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-                Box(Modifier.size(60.dp).background(rgb, RoundedCornerShape(8.dp)))
-                Spacer(Modifier.height(8.dp))
-                SliderRow(stringResource(R.string.editor_select_color), red, Color(0xFFB0524A)) { red = it }
-                SliderRow(stringResource(R.string.editor_select_color), green, Color(0xFF6B8E5A)) { green = it }
-                SliderRow(stringResource(R.string.editor_select_color), blue, Color(0xFF5A6B8E)) { blue = it }
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(value = customHex, onValueChange = { customHex = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.size(56.dp).background(rgb, RoundedCornerShape(10.dp)))
+            Spacer(Modifier.height(8.dp))
+            SliderRow(red, Color(0xFFB0524A)) { red = it }
+            SliderRow(green, Color(0xFF6B8E5A)) { green = it }
+            SliderRow(blue, Color(0xFF5A6B8E)) { blue = it }
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(
+                value = customHex,
+                onValueChange = { customHex = it },
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-    )
+    }
 }
 
 @Composable
-private fun SliderRow(label: String, value: Float, thumb: Color, onChange: (Float) -> Unit) {
+private fun SliderRow(value: Float, thumb: Color, onChange: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text("${(value * 255).roundToInt()}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(32.dp))
-        Slider(value = value, onValueChange = onChange, modifier = Modifier.fillMaxWidth().height(40.dp), colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = thumb))
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+            colors = SliderDefaults.colors(thumbColor = thumb)
+        )
     }
 }
 
@@ -100,27 +111,22 @@ private val SIZES = listOf(0.85f to "S", 1f to "M", 1.2f to "L", 1.5f to "XL")
 
 @Composable
 fun FontSizePickerDialog(onPick: (Float) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
-        title = { Text(stringResource(R.string.editor_format_size)) },
-        text = {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SIZES.forEach { (scale, label) ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = RoundedCornerShape(12.dp),
-                        onClick = { onPick(scale) },
-                        modifier = Modifier.weight(1f).padding(4.dp)
-                    ) {
-                        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("A", style = MaterialTheme.typography.headlineSmall.copy(fontSize = (16f * scale).sp))
-                            Spacer(Modifier.height(4.dp))
-                            Text(label, style = MaterialTheme.typography.labelMedium)
-                        }
+    NkDialog(onDismiss = onDismiss, title = stringResource(R.string.editor_format_size)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SIZES.forEach { (scale, label) ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = RoundedCornerShape(14.dp),
+                    onClick = { onPick(scale) },
+                    modifier = Modifier.weight(1f).padding(4.dp)
+                ) {
+                    Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("A", style = MaterialTheme.typography.headlineSmall.copy(fontSize = (16f * scale).sp), color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(4.dp))
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
-    )
+    }
 }

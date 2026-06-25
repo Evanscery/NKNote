@@ -14,6 +14,7 @@ sealed class Destination(val route: String) {
     }
     data object Trash : Destination("trash")
     data object Explore : Destination("explore")
+    data object Calendar : Destination("calendar")
     data object Tools : Destination("tools")
     data object Random : Destination("random")
     data object Settings : Destination("settings")

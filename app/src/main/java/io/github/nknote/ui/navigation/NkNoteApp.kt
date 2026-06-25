@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import io.github.nknote.ui.calendar.CalendarPage
 import io.github.nknote.ui.editor.EditorPage
 import io.github.nknote.ui.explore.ExplorePage
 import io.github.nknote.ui.home.HomePage
@@ -31,6 +32,7 @@ fun NkNoteApp() {
             },
             toTrash = { navController.navigate(Destination.Trash.route) },
             toExplore = { navController.navigate(Destination.Explore.route) },
+            toCalendar = { navController.navigate(Destination.Calendar.route) },
             toTools = { navController.navigate(Destination.Tools.route) },
             toRandom = { navController.navigate(Destination.Random.route) },
             toSettings = { navController.navigate(Destination.Settings.route) },
@@ -67,6 +69,7 @@ fun NkNoteApp() {
         }
         composable(Destination.Trash.route) { TrashPage(nav = nav) }
         composable(Destination.Explore.route) { ExplorePage(nav = nav, openNote = { nav.toEditor(it) }) }
+        composable(Destination.Calendar.route) { CalendarPage(nav = nav, openNote = { nav.toEditor(it) }) }
         composable(Destination.Tools.route) { ToolsPage(nav = nav) }
         composable(Destination.Random.route) { RandomPage(nav = nav) }
         composable(Destination.Settings.route) { SettingsPage(nav = nav) }

@@ -1,5 +1,6 @@
 package io.github.nknote.ui.viewer
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,7 +39,7 @@ import io.github.nknote.ui.theme.NkNoteTheme
 @Composable
 fun ImageViewerPage(imagePath: String, nav: NkNoteNavigation) {
     var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { androidx.compose.runtime.mutableStateOf(Offset.Zero) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     NkNoteTheme {
@@ -57,17 +59,53 @@ fun ImageViewerPage(imagePath: String, nav: NkNoteNavigation) {
                 )
             }
         ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding).pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 4f)
-                    offset = if (scale > 1f) offset + pan else Offset.Zero
-                }
-            }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    // Transform gestures: pinch-to-zoom + pan. Key on scale so the gesture
+                    // detector restarts when scale changes, preventing the stale-state bug.
+                    .pointerInput(scale) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 5f)
+                            scale = newScale
+                            offset = if (newScale > 1f) {
+                                val maxX = size.width * (newScale - 1f) / 2f
+                                val maxY = size.height * (newScale - 1f) / 2f
+                                Offset(
+                                    (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                    (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                )
+                            } else Offset.Zero
+                        }
+                    }
+                    // Double-tap to toggle zoom
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                } else {
+                                    scale = 2.5f
+                                    offset = Offset.Zero
+                                }
+                            }
+                        )
+                    }
+            ) {
                 AsyncImage(
                     model = imagePath,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale, translationX = offset.x, translationY = offset.y)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y
+                        )
                 )
             }
         }

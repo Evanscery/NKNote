@@ -41,6 +41,11 @@
     <string name="home_today">今天</string>
     <string name="home_this_day">去年今日 · %1$s</string>
 
+    <!-- Calendar -->
+    <string name="calendar_title">日历</string>
+    <string name="calendar_no_notes">这一天没有日记记录</string>
+    <string name="calendar_notes_count">%1$d 篇日记</string>
+
     <!-- Editor -->
     <string name="editor_title_placeholder">标题</string>
     <string name="editor_description">简介</string>

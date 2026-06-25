@@ -36,10 +36,21 @@ class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
     private val _noteCount = MutableStateFlow(0)
     val noteCount: StateFlow<Int> = _noteCount.asStateFlow()
 
+    private val _notesForDate = MutableStateFlow<List<Note>>(emptyList())
+    val notesForDate: StateFlow<List<Note>> = _notesForDate.asStateFlow()
+
     init {
         viewModelScope.launch { repo.observeAllNotes().collect { _noteCount.value = it.size } }
         viewModelScope.launch {
             repo.observeNotesOnMonthDay(monthDayStr()).collect { _todayThisDay.value = it }
+        }
+    }
+
+    suspend fun allDates(): List<String> = repo.allDates()
+
+    fun loadNotesForDate(date: String) {
+        viewModelScope.launch {
+            repo.observeNotesOnDate(date).collect { _notesForDate.value = it }
         }
     }
 

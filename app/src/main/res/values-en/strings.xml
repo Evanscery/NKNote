@@ -41,6 +41,11 @@
     <string name="home_today">Today</string>
     <string name="home_this_day">On this day · %1$s</string>
 
+    <!-- Calendar -->
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_no_notes">No notes on this day</string>
+    <string name="calendar_notes_count">%1$d notes</string>
+
     <!-- Editor -->
     <string name="editor_title_placeholder">Title</string>
     <string name="editor_description">Summary</string>

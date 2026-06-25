@@ -88,7 +88,7 @@ class ImageStore(private val context: Context) {
     }
 
     companion object {
-        private const val MAX_DIMEN = 1600
-        private const val QUALITY = 80
+        private const val MAX_DIMEN = 1280
+        private const val QUALITY = 70
     }
 }
