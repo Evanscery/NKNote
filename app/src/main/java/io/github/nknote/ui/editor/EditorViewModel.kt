@@ -50,6 +50,8 @@ class EditorViewModel(
         private set
     var moodKey by mutableStateOf("")
         private set
+    var coverImagePath by mutableStateOf<String?>(null)
+        private set
     val tagNames = mutableStateListOf<String>()
 
     private var document by mutableStateOf(EditorDocument())
@@ -78,6 +80,7 @@ class EditorViewModel(
         date = note.date
         weatherKey = note.weather
         moodKey = note.mood
+        coverImagePath = note.coverImagePath
         document = runCatching { json.decodeFromString<RichDocument>(note.content).toEditor() }
             .getOrDefault(EditorDocument())
         if (document.size == 0) document = EditorDocument()
@@ -93,6 +96,17 @@ class EditorViewModel(
     fun updateDate(v: String) { date = v }
     fun updateWeather(key: String) { weatherKey = key }
     fun updateMood(key: String) { moodKey = key }
+
+    fun setCoverImage(uri: android.net.Uri) {
+        val targetNoteId = noteId ?: -1
+        val path = imageStore.saveForNote(if (targetNoteId <= 0) 0 else targetNoteId, uri) ?: return
+        coverImagePath?.let { imageStore.delete(it) }
+        coverImagePath = path
+    }
+    fun removeCoverImage() {
+        coverImagePath?.let { imageStore.delete(it) }
+        coverImagePath = null
+    }
 
     fun addTag(name: String) {
         val n = name.trim()
@@ -212,14 +226,17 @@ class EditorViewModel(
         val model = document.toModel()
         val content = json.encodeToString(RichDocument.serializer(), model)
         val existing = noteId?.let { repo.getNote(it) }
+        // Prefer user-set cover; fall back to first inline image
+        val resolvedCover = coverImagePath ?: model.paragraphs.firstNotNullOfOrNull { it.image }?.path
         val note = (existing ?: Note(
             title = title, description = description, content = content,
             date = date, weather = weatherKey, mood = moodKey,
-            coverImagePath = model.paragraphs.firstNotNullOfOrNull { it.image }?.path,
+            coverImagePath = resolvedCover,
             createdAt = now, updatedAt = now
         )).copy(
             title = title, description = description, content = content,
             date = date, weather = weatherKey, mood = moodKey,
+            coverImagePath = resolvedCover,
             updatedAt = now, version = (existing?.version ?: 1) + 1
         )
         if (existing == null) {

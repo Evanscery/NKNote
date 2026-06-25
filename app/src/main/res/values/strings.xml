@@ -17,8 +17,20 @@
 
     <!-- Settings -->
     <string name="settings_section_data">数据</string>
+    <string name="settings_section_appearance">外观</string>
     <string name="settings_section_about">关于</string>
     <string name="home_all">全部</string>
+    <string name="settings_theme">主题模式</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_system">跟随系统</string>
+    <string name="settings_export">导出全部日记</string>
+    <string name="settings_export_subtitle">导出为 JSON 文件</string>
+    <string name="settings_about_version">版本</string>
+    <string name="settings_about_description">轻量、无服务器的日记应用</string>
+    <string name="settings_about_github">GitHub 仓库</string>
 
     <!-- Home -->
     <string name="home_title">日记</string>
@@ -56,6 +68,7 @@
     <string name="editor_no_image_selected">未选择图片</string>
     <string name="editor_custom_color">自定义颜色</string>
     <string name="editor_select_color">选择颜色</string>
+    <string name="editor_cover_image">封面图片</string>
 
     <!-- Viewer -->
     <string name="viewer_title">图片预览</string>

@@ -17,8 +17,20 @@
 
     <!-- Settings -->
     <string name="settings_section_data">Data</string>
+    <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_about">About</string>
     <string name="home_all">All</string>
+    <string name="settings_theme">Theme mode</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_export">Export all notes</string>
+    <string name="settings_export_subtitle">Export as a JSON file</string>
+    <string name="settings_about_version">Version</string>
+    <string name="settings_about_description">A lightweight, serverless diary app</string>
+    <string name="settings_about_github">GitHub repository</string>
 
     <!-- Home -->
     <string name="home_title">Diary</string>
@@ -56,6 +68,7 @@
     <string name="editor_no_image_selected">No image selected</string>
     <string name="editor_custom_color">Custom color</string>
     <string name="editor_select_color">Pick a color</string>
+    <string name="editor_cover_image">Cover image</string>
 
     <!-- Viewer -->
     <string name="viewer_title">Image preview</string>

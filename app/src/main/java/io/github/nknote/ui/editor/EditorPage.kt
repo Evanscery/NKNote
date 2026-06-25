@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -130,6 +131,9 @@ fun EditorPage(
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.insertImageAfter(viewModel.focusedIndex, uri)
     }
+    val coverImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.setCoverImage(uri)
+    }
 
     NkNoteTheme {
         Scaffold(
@@ -153,6 +157,9 @@ fun EditorPage(
                             weatherLabel = weatherLabel,
                             moodLabel = moodLabel,
                             date = viewModel.date,
+                            coverImagePath = viewModel.coverImagePath,
+                            onPickCoverImage = { coverImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            onRemoveCoverImage = { viewModel.removeCoverImage() },
                             onPickWeather = { showWeather = true },
                             onPickMood = { showMood = true },
                             onPickDate = { showDate = true }
@@ -229,7 +236,7 @@ private fun EditorTopBar(
     )
 }
 
-// ── Collapsed-by-default meta panel (title, desc, weather, mood, date) ──────────
+// ── Collapsed-by-default meta panel (title, desc, cover, weather, mood, date) ──
 
 @Composable
 private fun MetaPanel(
@@ -240,12 +247,17 @@ private fun MetaPanel(
     weatherLabel: String,
     moodLabel: String,
     date: String,
+    coverImagePath: String?,
+    onPickCoverImage: () -> Unit,
+    onRemoveCoverImage: () -> Unit,
     onPickWeather: () -> Unit,
     onPickMood: () -> Unit,
     onPickDate: () -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Cover image picker / preview
+            CoverImageSection(path = coverImagePath, onPick = onPickCoverImage, onRemove = onRemoveCoverImage)
             OutlinedTextField(
                 value = title,
                 onValueChange = onTitle,
@@ -267,6 +279,44 @@ private fun MetaPanel(
                 MetaChip(text = weatherLabel, fallback = stringResource(R.string.editor_select_weather), onClick = onPickWeather)
                 MetaChip(text = moodLabel, fallback = stringResource(R.string.editor_select_mood), onClick = onPickMood)
                 MetaChip(text = date, fallback = stringResource(R.string.editor_select_date), onClick = onPickDate)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverImageSection(path: String?, onPick: () -> Unit, onRemove: () -> Unit) {
+    if (path != null) {
+        Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+            coil.compose.AsyncImage(
+                model = path,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+            )
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+            ) {
+                Icon(Icons.Filled.Close, stringResource(R.string.common_close), tint = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    } else {
+        Surface(
+            onClick = onPick,
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth().height(80.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(Icons.Filled.Image, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.editor_cover_image), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -411,7 +461,11 @@ private fun FormatBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
-            .background(bgColor)
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.Transparent, bgColor.copy(alpha = 0.85f), bgColor)
+                )
+            )
     ) {
         // Subtle separator — soft, not a hard surface
         Box(
