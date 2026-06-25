@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private val query = MutableStateFlow("")
     private val _mode = MutableStateFlow(ViewMode.ALL)
@@ -51,7 +54,7 @@ class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
         if (note.title.contains(needle, true) || note.description.contains(needle, true)) return true
         // Search the plain text of the RichDocument, not raw JSON
         val plain = runCatching {
-            kotlinx.serialization.json.Json.decodeFromString<io.github.nknote.model.RichDocument>(note.content).plainText()
+            json.decodeFromString<io.github.nknote.model.RichDocument>(note.content).plainText()
         }.getOrNull().orEmpty()
         return plain.contains(needle, true)
     }
