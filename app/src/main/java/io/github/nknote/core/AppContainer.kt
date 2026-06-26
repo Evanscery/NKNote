@@ -2,6 +2,7 @@ package io.github.nknote.core
 
 import android.content.Context
 import io.github.nknote.data.db.NkNoteDatabase
+import io.github.nknote.data.image.AndroidImageStore
 import io.github.nknote.data.image.ImageStore
 import io.github.nknote.data.repository.NoteRepository
 import io.github.nknote.data.repository.NoteRepositoryImpl
@@ -16,7 +17,7 @@ class AppContainer(private val context: Context) {
 
     private val database: NkNoteDatabase by lazy { NkNoteDatabase.get(context) }
 
-    val imageStore: ImageStore by lazy { ImageStore(context) }
+    val imageStore: ImageStore by lazy { AndroidImageStore(context) }
 
     val noteRepository: NoteRepository by lazy {
         NoteRepositoryImpl(database.noteDao(), database.tagDao(), database.noteTagDao())
