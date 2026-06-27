@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import kotlinx.coroutines.launch
 
 data class NkDrawerItem(val label: String, val icon: ImageVector)
@@ -63,7 +64,7 @@ fun NkDrawer(
                         modifier = Modifier
                             .height(64.dp)
                             .width(64.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(20.dp)),
+                            .background(MaterialTheme.colorScheme.primaryContainer, NkShapes.largeSmall),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("N", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -80,7 +81,7 @@ fun NkDrawer(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = NkSpacing.md)) {
                     items.forEachIndexed { index, item ->
                         NavigationDrawerItem(
                             label = { Text(item.label, fontWeight = FontWeight.Medium) },
@@ -94,12 +95,12 @@ fun NkDrawer(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 unselectedContainerColor = androidx.compose.ui.graphics.Color.Transparent
                             ),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = NkShapes.smallMedium,
                             modifier = Modifier.padding(vertical = 2.dp)
                         )
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(NkSpacing.xl))
             }
         },
         content = { content(open) }
@@ -117,8 +118,8 @@ fun NkNoteCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surface, NkShapes.mediumLarge)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(16.dp)
+            .padding(NkSpacing.lg)
     ) { content() }
 }

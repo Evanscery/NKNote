@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,8 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,9 +42,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
+import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.home.HomeViewModel
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -72,22 +71,21 @@ fun CalendarPage(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.calendar_title)) },
-                    navigationIcon = { IconButton(onClick = nav.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                NkTopAppBar(
+                    title = stringResource(R.string.calendar_title),
+                    onBack = nav.back
                 )
             }
         ) { padding ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = NkSpacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Month nav
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = NkSpacing.md)
                 ) {
                     IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -116,7 +114,7 @@ fun CalendarPage(
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(NkSpacing.sm))
 
                 // Calendar grid
                 val firstDay = currentMonth.atDay(1)
@@ -154,19 +152,19 @@ fun CalendarPage(
                     val dateStr = date.toString()
                     LaunchedEffect(dateStr) { viewModel.loadNotesForDate(dateStr) }
                     val notesForDate by viewModel.notesForDate.collectAsStateWithLifecycle()
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(NkSpacing.lg))
                     if (notesForDate.isEmpty()) {
                         Text(stringResource(R.string.calendar_no_notes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        Text(stringResource(R.string.calendar_notes_count, notesForDate.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                        Text(stringResource(R.string.calendar_notes_count, notesForDate.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = NkSpacing.sm))
                         notesForDate.forEach { note ->
                             Surface(
                                 onClick = { openNote(note.id) },
                                 color = MaterialTheme.colorScheme.surface,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = NkShapes.mediumSmall,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                                Column(modifier = Modifier.padding(NkSpacing.md)) {
                                     Text(note.title.ifBlank { stringResource(R.string.common_no_title) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                                     Text(note.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }

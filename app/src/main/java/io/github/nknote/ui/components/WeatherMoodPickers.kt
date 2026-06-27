@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import io.github.nknote.R
 import io.github.nknote.model.Mood
 import io.github.nknote.model.Weather
+import io.github.nknote.ui.theme.NkShapes
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -34,7 +34,7 @@ fun WeatherPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
             Weather.entries.forEach { w ->
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = NkShapes.smallMedium,
                     onClick = { onPick(w.key) },
                     modifier = Modifier.padding(2.dp)
                 ) {
@@ -61,7 +61,7 @@ fun MoodPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
             Mood.entries.forEach { m ->
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = NkShapes.smallMedium,
                     onClick = { onPick(m.key) },
                     modifier = Modifier.padding(2.dp)
                 ) {

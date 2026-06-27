@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -58,10 +57,14 @@ import io.github.nknote.model.Weather
 import io.github.nknote.ui.components.MoodIconMap
 import io.github.nknote.ui.components.NkDrawer
 import io.github.nknote.ui.components.NkDrawerItem
+import io.github.nknote.ui.components.NkEmptyState
 import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.navigation.NkNoteNavigation
+import io.github.nknote.ui.theme.NkIconSize
 import io.github.nknote.ui.theme.NkNoteTheme
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import kotlinx.serialization.json.Json
 
 private val documentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -127,7 +130,7 @@ private fun HomeContent(
                 onClick = onNewNote,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(18.dp),
+                shape = NkShapes.mediumLarge,
                 icon = { Icon(Icons.Filled.Edit, null) },
                 text = { Text(stringResource(R.string.home_title)) }
             )
@@ -135,7 +138,7 @@ private fun HomeContent(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (notes.isEmpty()) {
-            EmptyState(
+            NkEmptyState(
                 message = if (query.isBlank()) stringResource(R.string.home_empty)
                 else stringResource(R.string.home_search_empty),
                 modifier = Modifier.padding(padding)
@@ -145,9 +148,9 @@ private fun HomeContent(
                 contentPadding = PaddingValues(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding() + 96.dp,
-                    start = 16.dp, end = 16.dp
+                    start = NkSpacing.lg, end = NkSpacing.lg
                 ),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(NkSpacing.md),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(notes, key = { it.id }) { note ->
@@ -166,14 +169,14 @@ private fun HomeTopBar(
     onOpenCalendar: () -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background) {
-        Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = NkSpacing.sm, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.Tune, null) }
                 Text(
                     text = stringResource(R.string.home_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 4.dp)
+                    modifier = Modifier.padding(start = NkSpacing.xs)
                 )
                 Spacer(Modifier.weight(1f))
                 // Issue 2: calendar button opens calendar view showing days with notes
@@ -187,7 +190,7 @@ private fun HomeTopBar(
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
-                shape = RoundedCornerShape(16.dp),
+                shape = NkShapes.medium,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -212,7 +215,7 @@ private fun NoteCard(note: Note, onClick: () -> Unit, onTrash: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(NkSpacing.xs))
                 Text(
                     text = note.excerpt.ifBlank { plainPreview(note.content) }.ifBlank { stringResource(R.string.common_no_description) },
                     style = MaterialTheme.typography.bodyMedium,
@@ -223,28 +226,21 @@ private fun NoteCard(note: Note, onClick: () -> Unit, onTrash: () -> Unit) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = NkSpacing.sm)
                 ) {
                     Weather.fromKey(note.weather)?.let {
-                        Icon(WeatherIconMap.icon(it), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                        Icon(WeatherIconMap.icon(it), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NkIconSize.sm))
                     }
                     Mood.fromKey(note.mood)?.let {
-                        Icon(MoodIconMap.icon(it), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(15.dp))
+                        Icon(MoodIconMap.icon(it), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(NkIconSize.sm))
                     }
                     Text(note.date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            IconButton(onClick = onTrash, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onTrash, modifier = Modifier.size(NkIconSize.xl)) {
                 Icon(Icons.Filled.DeleteOutline, stringResource(R.string.home_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyState(message: String, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

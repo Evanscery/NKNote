@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.nknote.R
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 
 /**
  * Theme-unified dialog wrapper. Replaces Material3's default AlertDialog with our
@@ -40,19 +41,19 @@ fun NkDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NkSpacing.xl),
             color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(20.dp),
+            shape = NkShapes.largeSmall,
             tonalElevation = 3.dp
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(modifier = Modifier.padding(NkSpacing.xl)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(NkSpacing.lg))
                 content()
                 Spacer(Modifier.height(20.dp))
                 Row(
@@ -63,7 +64,7 @@ fun NkDialog(
                         TextButton(onClick = onDismiss) {
                             Text(dismissText, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(NkSpacing.sm))
                     }
                     if (confirmText != null && onConfirm != null) {
                         TextButton(onClick = onConfirm) {

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -35,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.nknote.R
 import io.github.nknote.ui.editor.richtext.parseHexColor
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import kotlin.math.roundToInt
 
 private val PALETTE = listOf(
@@ -59,7 +60,7 @@ fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
         dismissText = stringResource(R.string.common_cancel)
     ) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NkSpacing.sm)) {
                 PALETTE.forEach { hex ->
                     val c = parseHexColor(hex) ?: Color.Black
                     Box(
@@ -70,18 +71,18 @@ fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Box(Modifier.size(56.dp).background(rgb, RoundedCornerShape(10.dp)))
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(NkSpacing.lg))
+            Box(Modifier.size(56.dp).background(rgb, NkShapes.small))
+            Spacer(Modifier.height(NkSpacing.sm))
             SliderRow(red, Color(0xFFB0524A)) { red = it }
             SliderRow(green, Color(0xFF6B8E5A)) { green = it }
             SliderRow(blue, Color(0xFF5A6B8E)) { blue = it }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(NkSpacing.xs))
             OutlinedTextField(
                 value = customHex,
                 onValueChange = { customHex = it },
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp),
+                shape = NkShapes.small,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -112,17 +113,17 @@ private val SIZES = listOf(0.85f to "S", 1f to "M", 1.2f to "L", 1.5f to "XL")
 @Composable
 fun FontSizePickerDialog(onPick: (Float) -> Unit, onDismiss: () -> Unit) {
     NkDialog(onDismiss = onDismiss, title = stringResource(R.string.editor_format_size)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NkSpacing.sm)) {
             SIZES.forEach { (scale, label) ->
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = NkShapes.smallMedium,
                     onClick = { onPick(scale) },
-                    modifier = Modifier.weight(1f).padding(4.dp)
+                    modifier = Modifier.weight(1f).padding(NkSpacing.xs)
                 ) {
-                    Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.padding(NkSpacing.md), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("A", style = MaterialTheme.typography.headlineSmall.copy(fontSize = (16f * scale).sp), color = MaterialTheme.colorScheme.onSurface)
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(NkSpacing.xs))
                         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

@@ -71,7 +71,7 @@ fun NkNoteTheme(
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = NkTypography,
-        shapes = NkShapes,
+        shapes = NkShapes.material,
         content = content
     )
 }

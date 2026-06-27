@@ -15,21 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,8 +38,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.nknote.R
+import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,21 +57,20 @@ fun RandomPage(nav: NkNoteNavigation) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.random_title)) },
-                    navigationIcon = { IconButton(onClick = nav.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                NkTopAppBar(
+                    title = stringResource(R.string.random_title),
+                    onBack = nav.back
                 )
             },
             bottomBar = {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth().padding(NkSpacing.lg),
+                    horizontalArrangement = Arrangement.spacedBy(NkSpacing.md)
                 ) {
                     Button(
                         onClick = { spinning = true },
                         enabled = !spinning && input.lines().any { it.isNotBlank() },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = NkShapes.medium,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.weight(1f).height(52.dp)
                     ) {
@@ -83,7 +79,7 @@ fun RandomPage(nav: NkNoteNavigation) {
                     Button(
                         onClick = { input = ""; result = ""; display = "" },
                         enabled = !spinning,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = NkShapes.medium,
                         colors = ButtonDefaults.outlinedButtonColors(),
                         modifier = Modifier.height(52.dp)
                     ) { Text(stringResource(R.string.random_clear)) }
@@ -91,10 +87,10 @@ fun RandomPage(nav: NkNoteNavigation) {
             }
         ) { padding ->
             Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(20.dp),
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(NkSpacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(NkSpacing.lg))
                 AnimatedContent(targetState = display.ifBlank { "—" }, transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(120)) }, label = "pick") { shown ->
                     Text(
                         text = stringResource(R.string.random_result, shown),
@@ -107,7 +103,7 @@ fun RandomPage(nav: NkNoteNavigation) {
                     value = input,
                     onValueChange = { input = it },
                     placeholder = { Text(stringResource(R.string.random_input_placeholder)) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = NkShapes.medium,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 320.dp)
                 )
             }

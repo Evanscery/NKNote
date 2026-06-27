@@ -8,20 +8,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +32,11 @@ import androidx.compose.ui.unit.dp
 import io.github.nknote.R
 import io.github.nknote.appContainer
 import io.github.nknote.data.importer.TextImporter
+import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
+import io.github.nknote.ui.theme.NkShapes
+import io.github.nknote.ui.theme.NkSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,28 +78,27 @@ fun ImportPage(nav: NkNoteNavigation) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.import_title)) },
-                    navigationIcon = { IconButton(onClick = nav.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                NkTopAppBar(
+                    title = stringResource(R.string.import_title),
+                    onBack = nav.back
                 )
             }
         ) { padding ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp),
+                modifier = Modifier.fillMaxSize().padding(padding).padding(NkSpacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(NkSpacing.lg)
             ) {
-                Icon(Icons.Filled.FileOpen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 24.dp))
+                Icon(Icons.Filled.FileOpen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = NkSpacing.xl))
                 Text(stringResource(R.string.import_hint), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 Button(
                     onClick = { launcher.launch(arrayOf("text/plain")) },
                     enabled = !busy,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = NkShapes.smallMedium
                 ) { Text(stringResource(R.string.import_pick_file)) }
                 status?.let {
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text(it, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = NkShapes.mediumSmall, modifier = Modifier.fillMaxWidth()) {
+                        Text(it, modifier = Modifier.padding(NkSpacing.lg), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

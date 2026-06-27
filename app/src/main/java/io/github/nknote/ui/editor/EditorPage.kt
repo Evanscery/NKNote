@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -106,6 +105,7 @@ import io.github.nknote.ui.editor.richtext.SpanVisualTransformation
 import io.github.nknote.ui.editor.richtext.numberedCounters
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
+import io.github.nknote.ui.theme.NkShapes
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -220,7 +220,7 @@ private fun EditorTopBar(
                     singleLine = true,
                     placeholder = { Text(stringResource(R.string.editor_title_placeholder)) },
                     textStyle = MaterialTheme.typography.titleLarge,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = NkShapes.mediumSmall,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onToggleDetails) {
@@ -265,14 +265,14 @@ private fun MetaPanel(
             OutlinedTextField(
                 value = title, onValueChange = onTitle, singleLine = true,
                 label = { Text(stringResource(R.string.editor_title_placeholder)) },
-                textStyle = MaterialTheme.typography.titleLarge, shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.titleLarge, shape = NkShapes.mediumSmall,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = excerpt, onValueChange = onExcerpt,
                 placeholder = { Text(stringResource(R.string.editor_description_placeholder)) },
                 label = { Text(stringResource(R.string.editor_description)) },
-                shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+                shape = NkShapes.mediumSmall, modifier = Modifier.fillMaxWidth()
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetaChip(text = weatherLabel, fallback = stringResource(R.string.editor_select_weather), onClick = onPickWeather)
@@ -290,7 +290,7 @@ private fun CoverImageSection(path: String?, onPick: () -> Unit, onRemove: () ->
             coil.compose.AsyncImage(
                 model = path, contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                modifier = Modifier.fillMaxSize().clip(NkShapes.mediumSmall)
             )
             IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                 Icon(Icons.Filled.Close, stringResource(R.string.common_close), tint = MaterialTheme.colorScheme.onSurface)
@@ -300,7 +300,7 @@ private fun CoverImageSection(path: String?, onPick: () -> Unit, onRemove: () ->
         Surface(
             onClick = onPick,
             color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(12.dp),
+            shape = NkShapes.mediumSmall,
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth().height(80.dp)
         ) {
@@ -315,7 +315,7 @@ private fun CoverImageSection(path: String?, onPick: () -> Unit, onRemove: () ->
 
 @Composable
 private fun MetaChip(text: String, fallback: String, onClick: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(12.dp), onClick = onClick) {
+    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = NkShapes.mediumSmall, onClick = onClick) {
         Text(text = text.ifBlank { fallback }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
     }
 }
@@ -448,7 +448,7 @@ private fun ImageBlock(path: String, aspectRatio: Float, onLongPress: () -> Unit
         modifier = Modifier
             .fillMaxWidth()
             .height(heightDp.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(NkShapes.small)
             .combinedClickable(
                 onClick = {},
                 onLongClick = onLongPress
