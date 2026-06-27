@@ -7,6 +7,11 @@ import kotlinx.serialization.Serializable
  *
  * The same schema is intended to be reused by the future web / desktop targets (see docs/multiplatform.md)
  * so that a note's content is byte-for-byte identical across platforms.
+ *
+ * Schema is backward-compatible: every field added after v1 carries a default so legacy JSON
+ * (encoded by older app versions) decodes without throwing. The serializer is configured with
+ * `ignoreUnknownKeys = true` + `encodeDefaults = true` (see [io.github.nknote.ui.editor.EditorViewModel]
+ * and [io.github.nknote.ui.home.HomeViewModel]), so future-added fields also round-trip cleanly.
  */
 @Serializable
 data class RichDocument(
@@ -22,11 +27,16 @@ data class RichDocument(
 data class RichParagraph(
     val spans: List<RichSpan> = emptyList(),
     val style: ParagraphStyle = ParagraphStyle.BODY,
-    val image: InlineImage? = null
+    val image: InlineImage? = null,
+    val alignment: ParagraphAlignment = ParagraphAlignment.START,
+    val indentLevel: Int = 0   // 0..3; clamped at the editor/toolbar layer
 )
 
 @Serializable
-enum class ParagraphStyle { TITLE, HEADING, SUBHEADING, BODY, QUOTE, BULLET, NUMBERED }
+enum class ParagraphStyle { TITLE, HEADING, SUBHEADING, BODY, QUOTE, BULLET, NUMBERED, CODE }
+
+@Serializable
+enum class ParagraphAlignment { START, CENTER, END }
 
 @Serializable
 data class RichSpan(
@@ -36,7 +46,8 @@ data class RichSpan(
     val underline: Boolean = false,
     val strikethrough: Boolean = false,
     val color: String? = null,   // ARGB hex, null = theme default
-    val fontSizeScale: Float = 1f
+    val fontSizeScale: Float = 1f,
+    val url: String? = null      // when non-null, this span is a hyperlink (rendered underlined + LinkAnnotation)
 )
 
 @Serializable

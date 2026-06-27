@@ -2,8 +2,11 @@ package io.github.nknote.ui.editor.richtext
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.UrlAnnotation
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -35,46 +38,95 @@ fun parseHexColor(hex: String?): Color? {
     }.getOrNull()
 }
 
-private fun RichSpan.toSpanStyle(): SpanStyle = SpanStyle(
-    fontWeight = if (bold) FontWeight.Bold else null,
-    fontStyle = if (italic) FontStyle.Italic else null,
-    textDecoration = when {
+/** Fallback code-block background when no theme color is supplied (e.g. in non-Composable tests). */
+val DefaultCodeBackground: Color = Color(0xFFEEEEEE)
+
+private fun RichSpan.toSpanStyle(): SpanStyle {
+    val decoration = when {
         underline && strikethrough -> TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
         underline -> TextDecoration.Underline
         strikethrough -> TextDecoration.LineThrough
+        url != null -> TextDecoration.Underline   // links render underlined in the editor
         else -> null
-    },
-    color = parseHexColor(color) ?: Color.Unspecified,
-    fontSize = if (fontSizeScale != 1f) fontSizeScale.em else TextUnit.Unspecified
-)
+    }
+    return SpanStyle(
+        fontWeight = if (bold) FontWeight.Bold else null,
+        fontStyle = if (italic) FontStyle.Italic else null,
+        textDecoration = decoration,
+        color = parseHexColor(color) ?: Color.Unspecified,
+        fontSize = if (fontSizeScale != 1f) fontSizeScale.em else TextUnit.Unspecified,
+    )
+}
 
-private fun baseStyleFor(style: ParagraphStyle): SpanStyle = when (style) {
+private fun baseStyleFor(style: ParagraphStyle, codeBackground: Color): SpanStyle = when (style) {
     ParagraphStyle.TITLE -> SpanStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp)
     ParagraphStyle.HEADING -> SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
     ParagraphStyle.SUBHEADING -> SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
     ParagraphStyle.QUOTE -> SpanStyle(fontStyle = FontStyle.Italic)
     ParagraphStyle.BULLET, ParagraphStyle.NUMBERED -> SpanStyle()
+    ParagraphStyle.CODE -> SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground)
     ParagraphStyle.BODY -> SpanStyle()
 }
 
-fun EditorParagraph.toAnnotatedString(): AnnotatedString {
-    if (text.isEmpty()) return AnnotatedString("")
-    val base = baseStyleFor(style)
+/** Indent leading-whitespace prefix; consumed by [SpanVisualTransformation] for offset math. */
+fun EditorParagraph.indentPrefix(): String =
+    if (indentLevel > 0) " ".repeat(indentLevel.coerceIn(0, 3) * 2) else ""
+
+/**
+ * Prefix shown for list/quote paragraphs. For `NUMBERED`, [numberedCounter] is the running
+ * sequence number (computed by [numberedCounters]); a non-`NUMBERED` paragraph resets the
+ * caller's counter to 1 (handled by [numberedCounters]).
+ */
+fun EditorParagraph.marker(numberedCounter: Int = 1): String = when (style) {
+    ParagraphStyle.BULLET -> "•  "
+    ParagraphStyle.NUMBERED -> "$numberedCounter. "
+    ParagraphStyle.QUOTE -> "“  "
+    else -> ""
+}
+
+/** Total visual-prefix length (indent + marker) for [paragraph]; used to build the [OffsetMapping]. */
+fun EditorParagraph.markerPrefixLength(numberedCounter: Int = 1): Int =
+    indentPrefix().length + marker(numberedCounter).length
+
+/**
+ * Render the paragraph (spans + marker + indent prefix) as a single [AnnotatedString].
+ *
+ * The marker (`• `, `1. `, `" `) and indent whitespace are prepended INSIDE this string
+ * (not as a separate TextField), so the visual text = prefix + raw text. Callers wrapping this
+ * in a [VisualTransformation] must shift offsets by [markerPrefixLength].
+ *
+ * `RichSpan.url` is emitted as a [UrlAnnotation] (clickable when rendered via `ClickableText`
+ * or `BasicText` with a `linkInteractionHandler`; underlined here via [RichSpan.toSpanStyle]).
+ * `ParagraphStyle.CODE` is rendered as a monospace [SpanStyle] with a code-block background.
+ */
+@OptIn(ExperimentalTextApi::class)
+fun EditorParagraph.toAnnotatedString(
+    numberedCounter: Int = 1,
+    codeBackground: Color = DefaultCodeBackground
+): AnnotatedString {
+    val base = baseStyleFor(style, codeBackground)
+    val marker = marker(numberedCounter)
+    val indent = indentPrefix()
     return buildAnnotatedString {
         pushStyle(base)
+        if (indent.isNotEmpty()) append(indent)
+        if (marker.isNotEmpty()) append(marker)
         for (span in spans) {
-            pushStyle(span.toSpanStyle())
-            append(span.text)
-            pop()
+            val url = span.url
+            if (url != null) {
+                // UrlAnnotation is honored by ClickableText / BasicText(linkInteractionHandler);
+                // in the editor BasicTextField the underline (above) is the visible cue.
+                pushUrlAnnotation(UrlAnnotation(url))
+                pushStyle(span.toSpanStyle())
+                append(span.text)
+                pop()
+                pop()
+            } else {
+                pushStyle(span.toSpanStyle())
+                append(span.text)
+                pop()
+            }
         }
         pop()
     }
-}
-
-/** Prefix shown for list/quote paragraphs. */
-fun EditorParagraph.marker(): String = when (style) {
-    ParagraphStyle.BULLET -> "•  "
-    ParagraphStyle.NUMBERED -> "1. "
-    ParagraphStyle.QUOTE -> "“  "
-    else -> ""
 }

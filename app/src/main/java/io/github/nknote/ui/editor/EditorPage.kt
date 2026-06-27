@@ -84,6 +84,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -91,6 +92,7 @@ import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
 import io.github.nknote.appContainer
 import io.github.nknote.model.Mood
+import io.github.nknote.model.ParagraphAlignment
 import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.Weather
 import io.github.nknote.ui.components.ColorPickerDialog
@@ -101,6 +103,7 @@ import io.github.nknote.ui.components.NkDialog
 import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.components.WeatherPickerDialog
 import io.github.nknote.ui.editor.richtext.SpanVisualTransformation
+import io.github.nknote.ui.editor.richtext.numberedCounters
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import java.time.Instant
@@ -345,6 +348,9 @@ private fun EditorContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        // Running numbered-list counter per paragraph: 1, 2, 3 for consecutive NUMBERED paragraphs,
+        // resetting to 1 after any non-NUMBERED paragraph (computed in richtext.numberedCounters).
+        val counters = remember(viewModel.paragraphs) { numberedCounters(viewModel.paragraphs) }
         viewModel.paragraphs.forEachIndexed { index, para ->
             if (para.image != null) {
                 ImageBlock(
@@ -356,7 +362,8 @@ private fun EditorContent(
                 ParagraphField(
                     index = index,
                     viewModel = viewModel,
-                    focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester()
+                    focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester(),
+                    numberedCounter = counters.getOrNull(index) ?: 0
                 )
             }
         }
@@ -376,11 +383,20 @@ private fun EditorContent(
 private fun ParagraphField(
     index: Int,
     viewModel: EditorViewModel,
-    focusRequester: FocusRequester
+    focusRequester: FocusRequester,
+    numberedCounter: Int
 ) {
     val para = viewModel.paragraphs[index]
     val value = viewModel.fields.getOrNull(index) ?: TextFieldValue("")
-    val transformation = remember(para) { SpanVisualTransformation(para) }
+    val codeBackground = MaterialTheme.colorScheme.surfaceVariant
+    val textAlign = when (para.alignment) {
+        ParagraphAlignment.START -> TextAlign.Start
+        ParagraphAlignment.CENTER -> TextAlign.Center
+        ParagraphAlignment.END -> TextAlign.End
+    }
+    val transformation = remember(para, numberedCounter, codeBackground) {
+        SpanVisualTransformation(para, numberedCounter, codeBackground)
+    }
 
     BasicTextField(
         value = value,
@@ -392,7 +408,10 @@ private fun ParagraphField(
                 viewModel.onTextChange(index, tv)
             }
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = textAlign
+        ),
         visualTransformation = transformation,
         cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
         modifier = Modifier

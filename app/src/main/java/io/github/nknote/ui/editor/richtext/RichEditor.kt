@@ -1,6 +1,7 @@
 package io.github.nknote.ui.editor.richtext
 
 import io.github.nknote.model.InlineImage
+import io.github.nknote.model.ParagraphAlignment
 import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.RichDocument
 import io.github.nknote.model.RichParagraph
@@ -20,7 +21,9 @@ data class EditorParagraph(
     val style: ParagraphStyle = ParagraphStyle.BODY,
     val text: String = "",
     val spans: List<RichSpan> = emptyList(),   // partition; spans[i].text concatenates to [text]
-    val image: InlineImage? = null
+    val image: InlineImage? = null,
+    val alignment: ParagraphAlignment = ParagraphAlignment.START,
+    val indentLevel: Int = 0   // 0..3; mirrored from RichParagraph for renderer consumption
 )
 
 /** Build the display AnnotatedString's character coverage from spans. Returns one style per char. */
@@ -59,7 +62,8 @@ private fun repartition(chars: List<RichSpan>): List<RichSpan> {
 
 private fun sameStyle(a: RichSpan, b: RichSpan): Boolean =
     a.bold == b.bold && a.italic == b.italic && a.underline == b.underline &&
-        a.strikethrough == b.strikethrough && a.color == b.color && a.fontSizeScale == b.fontSizeScale
+        a.strikethrough == b.strikethrough && a.color == b.color && a.fontSizeScale == b.fontSizeScale &&
+        a.url == b.url
 
 /** Apply [transform] to every char in [start, end), then re-merge. */
 fun EditorParagraph.withSpanToggled(start: Int, end: Int, transform: (RichSpan) -> RichSpan): EditorParagraph {
@@ -134,7 +138,9 @@ fun EditorDocument.toModel(): RichDocument =
         RichParagraph(
             spans = if (p.text.isEmpty()) emptyList() else p.spans.map { it.copy(text = it.text) }.let { ensureCovers(it, p.text) },
             style = p.style,
-            image = p.image
+            image = p.image,
+            alignment = p.alignment,
+            indentLevel = p.indentLevel
         )
     })
 
@@ -147,5 +153,34 @@ private fun ensureCovers(spans: List<RichSpan>, text: String): List<RichSpan> {
 
 fun RichDocument.toEditor(): EditorDocument =
     EditorDocument(paragraphs.map { p ->
-        EditorParagraph(style = p.style, text = p.spans.joinToString("") { it.text }, spans = p.spans, image = p.image)
+        EditorParagraph(
+            style = p.style,
+            text = p.spans.joinToString("") { it.text },
+            spans = p.spans,
+            image = p.image,
+            alignment = p.alignment,
+            indentLevel = p.indentLevel
+        )
     })
+
+/**
+ * Compute the running numbered-list counter for each paragraph in [paragraphs].
+ *
+ * A `NUMBERED` paragraph's counter increments while the preceding paragraph is also `NUMBERED`,
+ * and resets to 1 when a non-`NUMBERED` paragraph is encountered. Non-`NUMBERED` paragraphs
+ * carry counter 0 (they have no number). This is consumed by the renderer (AnnotatedStringRenderer)
+ * so `1. 2. 3. ` prefixes auto-increment across consecutive numbered paragraphs.
+ */
+fun numberedCounters(paragraphs: List<EditorParagraph>): IntArray {
+    val out = IntArray(paragraphs.size)
+    var counter = 0
+    for ((i, p) in paragraphs.withIndex()) {
+        counter = when {
+            p.style != ParagraphStyle.NUMBERED -> 0
+            i > 0 && paragraphs[i - 1].style == ParagraphStyle.NUMBERED -> counter + 1
+            else -> 1
+        }
+        out[i] = counter
+    }
+    return out
+}
