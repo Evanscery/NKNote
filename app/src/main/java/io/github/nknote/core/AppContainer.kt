@@ -20,7 +20,7 @@ class AppContainer(private val context: Context) {
     val imageStore: ImageStore by lazy { AndroidImageStore(context) }
 
     val noteRepository: NoteRepository by lazy {
-        NoteRepositoryImpl(database.noteDao(), database.tagDao(), database.noteTagDao())
+        NoteRepositoryImpl(database.noteDao(), database.tagDao(), database.noteTagDao(), imageStore)
     }
 
     /**

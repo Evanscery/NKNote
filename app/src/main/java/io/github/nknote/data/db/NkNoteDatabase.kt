@@ -4,15 +4,19 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import io.github.nknote.data.entity.Note
+import io.github.nknote.data.entity.NoteFts
 import io.github.nknote.data.entity.NoteTag
 import io.github.nknote.data.entity.Tag
 
 @Database(
-    entities = [Note::class, Tag::class, NoteTag::class],
-    version = 1,
-    exportSchema = false
+    entities = [Note::class, Tag::class, NoteTag::class, NoteFts::class],
+    version = 2,
+    exportSchema = true
 )
+@TypeConverters(Converters::class)
 abstract class NkNoteDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun tagDao(): TagDao
@@ -22,13 +26,24 @@ abstract class NkNoteDatabase : RoomDatabase() {
         @Volatile
         private var instance: NkNoteDatabase? = null
 
+        /**
+         * Empty seam for FUTURE data-preserving migrations. The current destructive rebuild
+         * (owner-approved — no real users yet) is intentional; do NOT add row-copy migrations here
+         * unless a real schema-preserving upgrade is required. Keep [fallbackToDestructiveMigration]
+         * on so any unhandled migration rebuilds cleanly.
+         */
+        val MIGRATIONS: Array<Migration> = arrayOf()
+
         fun get(context: Context): NkNoteDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NkNoteDatabase::class.java,
                     "nknote.db"
-                ).fallbackToDestructiveMigration().build().also { instance = it }
+                )
+                    .addMigrations(*MIGRATIONS)
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

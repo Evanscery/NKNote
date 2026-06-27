@@ -8,61 +8,75 @@ import androidx.room.Query
 import androidx.room.Update
 import io.github.nknote.data.entity.Note
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 @Dao
-interface NoteDao {
+abstract class NoteDao {
     @Query("SELECT * FROM notes WHERE isDeleted = 0 ORDER BY date DESC, updatedAt DESC")
-    fun observeAll(): Flow<List<Note>>
+    abstract fun observeAll(): Flow<List<Note>>
 
     @Query("SELECT * FROM notes WHERE isDeleted = 1 ORDER BY deletedAt DESC")
-    fun observeDeleted(): Flow<List<Note>>
+    abstract fun observeDeleted(): Flow<List<Note>>
 
     @Query("SELECT * FROM notes WHERE id = :id")
-    fun observeById(id: Int): Flow<Note?>
+    abstract fun observeById(id: Int): Flow<Note?>
 
     @Query("SELECT * FROM notes WHERE id = :id")
-    suspend fun getById(id: Int): Note?
+    abstract suspend fun getById(id: Int): Note?
+
+    /**
+     * Full-text search via the `note_fts` contentEntity table. Room's `contentEntity` triggers
+     * keep `note_fts` in sync with `notes`, so no manual FTS maintenance is needed.
+     *
+     * Guard: `MATCH ''` throws `SQLiteDoneException`, so empty/blank queries return an empty
+     * flow instead of reaching the FTS query. This is the [search] entry point — callers
+     * never need to blank-check.
+     */
+    fun search(query: String): Flow<List<Note>> =
+        if (query.isBlank()) flowOf(emptyList()) else searchFts(query)
 
     @Query(
         """
-        SELECT * FROM notes
-        WHERE isDeleted = 0 AND (
-            title LIKE '%' || :query || '%' OR
-            excerpt LIKE '%' || :query || '%' OR
-            content LIKE '%' || :query || '%'
-        )
-        ORDER BY date DESC, updatedAt DESC
+        SELECT notes.* FROM notes
+        JOIN note_fts ON notes.rowid = note_fts.rowid
+        WHERE notes.isDeleted = 0 AND note_fts MATCH :query
+        ORDER BY notes.date DESC, notes.updatedAt DESC
         """
     )
-    fun search(query: String): Flow<List<Note>>
+    protected abstract fun searchFts(query: String): Flow<List<Note>>
 
     @Query("SELECT * FROM notes WHERE isDeleted = 0 AND date = :date")
-    fun observeByDate(date: String): Flow<List<Note>>
+    abstract fun observeByDate(date: String): Flow<List<Note>>
 
-    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND substr(date, 6) = :monthDay ORDER BY date DESC")
-    fun observeByMonthDay(monthDay: String): Flow<List<Note>>
+    /** Uses the denormalized [io.github.nknote.data.entity.Note.monthDay] column (no `substr()`). */
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND monthDay = :monthDay ORDER BY date DESC")
+    abstract fun observeByMonthDay(monthDay: String): Flow<List<Note>>
 
     @Query("SELECT DISTINCT date FROM notes WHERE isDeleted = 0")
-    suspend fun allDates(): List<String>
+    abstract suspend fun allDates(): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(note: Note): Long
+    abstract suspend fun insert(note: Note): Long
 
     @Update
-    suspend fun update(note: Note)
+    abstract suspend fun update(note: Note)
 
     @Delete
-    suspend fun delete(note: Note)
+    abstract suspend fun delete(note: Note)
 
     @Query("DELETE FROM notes WHERE id = :id")
-    suspend fun deleteById(id: Int)
+    abstract suspend fun deleteById(id: Int)
 
     @Query("UPDATE notes SET isDeleted = 1, deletedAt = :now WHERE id = :id")
-    suspend fun moveToTrash(id: Int, now: Long)
+    abstract suspend fun moveToTrash(id: Int, now: Long)
 
     @Query("UPDATE notes SET isDeleted = 0, deletedAt = NULL WHERE id = :id")
-    suspend fun restore(id: Int)
+    abstract suspend fun restore(id: Int)
 
     @Query("DELETE FROM notes WHERE isDeleted = 1")
-    suspend fun emptyTrash()
+    abstract suspend fun emptyTrash()
+
+    /** Returns the ids of all soft-deleted notes — used to clean up image files before [emptyTrash]. */
+    @Query("SELECT id FROM notes WHERE isDeleted = 1")
+    abstract suspend fun getDeletedIds(): List<Int>
 }
