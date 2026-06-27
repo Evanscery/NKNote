@@ -43,6 +43,20 @@ private fun EditorParagraph.perCharStyles(): List<RichSpan> {
     return out
 }
 
+/**
+ * The [RichSpan] covering character position [position] (collapsed selection). For a cursor at
+ * end-of-text (`position == text.length`), returns the last char's span. Returns null for an
+ * empty paragraph. Used by [io.github.nknote.ui.editor.EditorViewModel] to compute the active
+ * style at the cursor (the `styleAtCursor` field of [io.github.nknote.ui.editor.EditorUiState]).
+ */
+fun EditorParagraph.spanAt(position: Int): RichSpan? {
+    if (text.isEmpty()) return null
+    val p = position.coerceIn(0, text.length)
+    val charIdx = if (p == text.length) p - 1 else p
+    if (charIdx < 0) return null
+    return perCharStyles().getOrNull(charIdx)
+}
+
 /** Re-partition a per-char style list back into contiguous merged spans. */
 private fun repartition(chars: List<RichSpan>): List<RichSpan> {
     if (chars.isEmpty()) return emptyList()

@@ -41,7 +41,12 @@ fun parseHexColor(hex: String?): Color? {
 /** Fallback code-block background when no theme color is supplied (e.g. in non-Composable tests). */
 val DefaultCodeBackground: Color = Color(0xFFEEEEEE)
 
-private fun RichSpan.toSpanStyle(): SpanStyle {
+/**
+ * Convert this [RichSpan] to a Compose [SpanStyle]. Public so [io.github.nknote.ui.editor.EditorViewModel]
+ * can reuse it for the active-style-at-cursor query (`EditorUiState.styleAtCursor`) — keeping the
+ * style mapping in one place so the editor indicator and the renderer never drift apart.
+ */
+fun RichSpan.toSpanStyle(): SpanStyle {
     val decoration = when {
         underline && strikethrough -> TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
         underline -> TextDecoration.Underline

@@ -33,6 +33,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
@@ -75,11 +77,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -179,7 +185,11 @@ fun EditorPage(
                     onHeading = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.HEADING) },
                     onQuote = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.QUOTE) },
                     onBullet = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.BULLET) },
-                    onImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                    onImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onUndo = { viewModel.undo() },
+                    onRedo = { viewModel.redo() },
+                    canUndo = uiState.canUndo,
+                    canRedo = uiState.canRedo
                 )
             }
         ) { padding ->
@@ -328,9 +338,20 @@ private fun EditorContent(
     val focusRequesters = remember { androidx.compose.runtime.mutableStateListOf<FocusRequester>() }
     while (focusRequesters.size < viewModel.paragraphs.size) focusRequesters.add(FocusRequester())
 
+    // Column + verticalScroll (NOT LazyColumn): EditorParagraph has no stable id and BasicTextField
+    // loses focus on LazyColumn item recycling. Diary-length docs compose fine in a Column.
+    val scrollState = rememberScrollState()
+    // Per-paragraph y-offset within the scrollable content (captured via onGloballyPositioned),
+    // used by scroll-to-focused: when pendingFocusIndex triggers, animateScrollTo the target's y.
+    val paragraphOffsets = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
+    while (paragraphOffsets.size < viewModel.paragraphs.size) paragraphOffsets.add(0)
+
     LaunchedEffect(viewModel.pendingFocusIndex) {
         val idx = viewModel.pendingFocusIndex
         if (idx >= 0 && idx < focusRequesters.size) {
+            // Scroll the focused paragraph into view, then request focus so the layout has settled.
+            val target = paragraphOffsets.getOrNull(idx) ?: 0
+            runCatching { scrollState.animateScrollTo(target) }
             runCatching { focusRequesters[idx].requestFocus() }
             viewModel.consumePendingFocus()
         }
@@ -339,7 +360,7 @@ private fun EditorContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -348,19 +369,31 @@ private fun EditorContent(
         // resetting to 1 after any non-NUMBERED paragraph (computed in richtext.numberedCounters).
         val counters = remember(viewModel.paragraphs) { numberedCounters(viewModel.paragraphs) }
         viewModel.paragraphs.forEachIndexed { index, para ->
-            if (para.image != null) {
-                ImageBlock(
-                    path = para.image.path,
-                    aspectRatio = para.image.width.toFloat() / para.image.height.toFloat(),
-                    onLongPress = { nav.toViewer(para.image.path) }
-                )
-            } else {
-                ParagraphField(
-                    index = index,
-                    viewModel = viewModel,
-                    focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester(),
-                    numberedCounter = counters.getOrNull(index) ?: 0
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coords ->
+                        // Content-space y-offset = on-screen position + current scroll offset.
+                        if (index < paragraphOffsets.size) {
+                            paragraphOffsets[index] =
+                                (coords.positionInRoot().y + scrollState.value).toInt()
+                        }
+                    }
+            ) {
+                if (para.image != null) {
+                    ImageBlock(
+                        path = para.image.path,
+                        aspectRatio = para.image.width.toFloat() / para.image.height.toFloat(),
+                        onLongPress = { nav.toViewer(para.image.path) }
+                    )
+                } else {
+                    ParagraphField(
+                        index = index,
+                        viewModel = viewModel,
+                        focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester(),
+                        numberedCounter = counters.getOrNull(index) ?: 0
+                    )
+                }
             }
         }
         // Issue 6: tappable blank space at bottom — focuses last text paragraph
@@ -416,15 +449,23 @@ private fun ParagraphField(
             .heightIn(min = 32.dp)
             .focusRequester(focusRequester)
             .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp &&
-                    keyEvent.key == Key.Backspace &&
-                    value.selection.start == 0 &&
-                    value.selection.end == 0 &&
-                    index > 0
-                ) {
-                    viewModel.mergeWithPrevious(index)
-                    true
-                } else false
+                when {
+                    // Ctrl+Z = undo, Ctrl+Shift+Z = redo (hardware keyboard).
+                    keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Z && keyEvent.isCtrlPressed -> {
+                        if (keyEvent.isShiftPressed) viewModel.redo() else viewModel.undo()
+                        true
+                    }
+                    keyEvent.type == KeyEventType.KeyUp &&
+                        keyEvent.key == Key.Backspace &&
+                        value.selection.start == 0 &&
+                        value.selection.end == 0 &&
+                        index > 0
+                    -> {
+                        viewModel.mergeWithPrevious(index)
+                        true
+                    }
+                    else -> false
+                }
             }
             .padding(vertical = 4.dp)
     )
@@ -458,7 +499,9 @@ private fun ImageBlock(path: String, aspectRatio: Float, onLongPress: () -> Unit
 private fun FormatBar(
     onBold: () -> Unit, onItalic: () -> Unit, onUnderline: () -> Unit, onStrike: () -> Unit,
     onColor: () -> Unit, onSize: () -> Unit, onHeading: () -> Unit, onQuote: () -> Unit,
-    onBullet: () -> Unit, onImage: () -> Unit
+    onBullet: () -> Unit, onImage: () -> Unit,
+    onUndo: () -> Unit, onRedo: () -> Unit,
+    canUndo: Boolean, canRedo: Boolean
 ) {
     val scrollState = rememberScrollState()
     val bgColor = MaterialTheme.colorScheme.background
@@ -478,6 +521,9 @@ private fun FormatBar(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Undo / redo lead the bar (also reachable via Ctrl+Z / Ctrl+Shift+Z on a HW keyboard).
+                Fmt(Icons.AutoMirrored.Filled.Undo, R.string.common_undo, onUndo, enabled = canUndo)
+                Fmt(Icons.AutoMirrored.Filled.Redo, R.string.common_redo, onRedo, enabled = canRedo)
                 Fmt(Icons.Filled.FormatBold, R.string.editor_format_bold, onBold)
                 Fmt(Icons.Filled.FormatItalic, R.string.editor_format_italic, onItalic)
                 Fmt(Icons.Filled.FormatUnderlined, R.string.editor_format_underline, onUnderline)
@@ -500,9 +546,14 @@ private fun FormatBar(
 }
 
 @Composable
-private fun Fmt(icon: ImageVector, desc: Int, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(icon, stringResource(desc), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+private fun Fmt(icon: ImageVector, desc: Int, onClick: () -> Unit, enabled: Boolean = true) {
+    IconButton(onClick = onClick, enabled = enabled) {
+        Icon(
+            icon,
+            stringResource(desc),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.7f else 0.3f),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

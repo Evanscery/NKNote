@@ -121,6 +121,8 @@
     <string name="common_save">Save</string>
     <string name="common_no_title">Untitled</string>
     <string name="common_no_description">No summary for this note</string>
+    <string name="common_undo">Undo</string>
+    <string name="common_redo">Redo</string>
 
     <!-- Weather -->
     <string name="weather_sunny">Sunny</string>

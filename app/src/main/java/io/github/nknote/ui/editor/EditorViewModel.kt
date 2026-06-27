@@ -1,4 +1,4 @@
-﻿package io.github.nknote.ui.editor
+package io.github.nknote.ui.editor
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -18,19 +18,23 @@ import io.github.nknote.model.InlineImage
 import io.github.nknote.model.NkPalette
 import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.RichDocument
+import io.github.nknote.model.RichSpan
 import io.github.nknote.ui.editor.richtext.EditorDocument
 import io.github.nknote.ui.editor.richtext.EditorParagraph
 import io.github.nknote.ui.editor.richtext.afterTextChange
 import io.github.nknote.ui.editor.richtext.merge
 import io.github.nknote.ui.editor.richtext.setColor
 import io.github.nknote.ui.editor.richtext.setFontSizeScale
+import io.github.nknote.ui.editor.richtext.spanAt
 import io.github.nknote.ui.editor.richtext.splitAt
 import io.github.nknote.ui.editor.richtext.toEditor
 import io.github.nknote.ui.editor.richtext.toModel
+import io.github.nknote.ui.editor.richtext.toSpanStyle
 import io.github.nknote.ui.editor.richtext.toggleBold
 import io.github.nknote.ui.editor.richtext.toggleItalic
 import io.github.nknote.ui.editor.richtext.toggleStrikethrough
 import io.github.nknote.ui.editor.richtext.toggleUnderline
+import io.github.nknote.ui.editor.richtext.withSpanToggled
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,7 +55,9 @@ import java.time.LocalDate
  * typing risks losing intermediate `TextFieldValue` edits, in particular the IME composition +
  * selection). This split is the load-bearing MVVM decision for the editor.
  *
- * `canUndo` / `canRedo` / `styleAtCursor` are stubs here; the undo/redo engine lands in todo 7.
+ * `canUndo` / `canRedo` reflect the [EditorViewModel] command stacks; `styleAtCursor` is the merged
+ * [SpanStyle] of the span under the cursor (null when the cursor is in an empty paragraph);
+ * `wordCount` / `charCount` are derived from [RichDocument.plainText].
  */
 data class EditorUiState(
     val title: String = "",
@@ -64,7 +70,8 @@ data class EditorUiState(
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val styleAtCursor: SpanStyle? = null,
-    val wordCount: Int = 0
+    val wordCount: Int = 0,
+    val charCount: Int = 0
 )
 
 /**
@@ -75,6 +82,126 @@ data class EditorUiState(
  */
 @Serializable
 internal data class DraftSelection(val text: String, val start: Int, val end: Int)
+
+/**
+ * Reversible editor mutation. The undo/redo engine stores *commands* (targeted per-paragraph
+ * diffs), NOT raw document snapshots — each command carries exactly the before/after state of the
+ * region it touched, so the stack stays light even for large documents. See the individual
+ * subclasses for the mutations covered (text edit, span toggle / paragraph-style change, paragraph
+ * split, paragraph merge, image insert). Image *removal* is intentionally NOT reversible (the
+ * image file is deleted on removal — a permanent action — so re-inserting the paragraph would
+ * point at a missing file).
+ */
+private sealed interface EditorCommand {
+    fun undo(vm: EditorViewModel)
+    fun redo(vm: EditorViewModel)
+}
+
+/** Replace a single paragraph (and optionally its field value). Covers text edits and span / paragraph-style changes. */
+private class ReplaceCmd(
+    val index: Int,
+    val beforePara: EditorParagraph,
+    val afterPara: EditorParagraph,
+    val beforeField: TextFieldValue? = null,
+    val afterField: TextFieldValue? = null
+) : EditorCommand {
+    override fun undo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index, beforePara)
+        if (beforeField != null) vm.cmdSetField(index, beforeField)
+        vm.cmdAfterMutation()
+    }
+    override fun redo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index, afterPara)
+        if (afterField != null) vm.cmdSetField(index, afterField)
+        vm.cmdAfterMutation()
+    }
+}
+
+/** Split a paragraph on Enter (one paragraph → two). */
+private class SplitCmd(
+    val index: Int,
+    val originalPara: EditorParagraph,    // paragraph before the split (full text)
+    val beforeHalfPara: EditorParagraph, // paragraph[index] after the split (text before cursor)
+    val afterPara: EditorParagraph,       // paragraph[index+1] created by the split
+    val originalField: TextFieldValue,    // field[index] before the split
+    val beforeHalfField: TextFieldValue,  // field[index] after the split
+    val afterField: TextFieldValue,       // field[index+1] after the split
+    val prevFocus: Int                    // focused index before the split
+) : EditorCommand {
+    override fun undo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index, originalPara)
+        vm.cmdRemoveParagraphAt(index + 1)
+        vm.cmdSetField(index, originalField)
+        vm.cmdRemoveField(index + 1)
+        vm.cmdSetFocusedAndPending(prevFocus)
+        vm.cmdAfterMutation()
+    }
+    override fun redo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index, beforeHalfPara)
+        vm.cmdInsertParagraphAfter(index, afterPara)
+        vm.cmdSetField(index, beforeHalfField)
+        vm.cmdAddField(index + 1, afterField)
+        vm.cmdSetFocusedAndPending(index + 1)
+        vm.cmdAfterMutation()
+    }
+}
+
+/** Merge a paragraph into the previous one (backspace at start). */
+private class MergeCmd(
+    val index: Int,                          // the removed paragraph's index
+    val prevPara: EditorParagraph,           // paragraph[index-1] before the merge
+    val curPara: EditorParagraph,            // paragraph[index] before the merge (removed)
+    val mergedPara: EditorParagraph,         // paragraph[index-1] after the merge
+    val prevField: TextFieldValue,           // field[index-1] before the merge
+    val curField: TextFieldValue,            // field[index] before the merge
+    val mergedField: TextFieldValue,         // field[index-1] after the merge
+    val prevFocus: Int                       // focused index before the merge
+) : EditorCommand {
+    override fun undo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index - 1, prevPara)
+        vm.cmdInsertParagraphAfter(index - 1, curPara)
+        vm.cmdSetField(index - 1, prevField)
+        vm.cmdAddField(index, curField)
+        vm.cmdSetFocusedAndPending(prevFocus)
+        vm.cmdAfterMutation()
+    }
+    override fun redo(vm: EditorViewModel) {
+        vm.cmdUpdateParagraph(index - 1, mergedPara)
+        vm.cmdRemoveParagraphAt(index)
+        vm.cmdSetField(index - 1, mergedField)
+        vm.cmdRemoveField(index)
+        vm.cmdSetFocusedAndPending(index - 1)
+        vm.cmdAfterMutation()
+    }
+}
+
+/** Insert an image paragraph + an empty text paragraph after it (the editor auto-inserts the text paragraph). */
+private class ImageInsertCmd(
+    val insertAt: Int,                       // image paragraph goes at insertAt+1, text at insertAt+2
+    val imagePara: EditorParagraph,
+    val textPara: EditorParagraph,
+    val prevFocus: Int
+) : EditorCommand {
+    override fun undo(vm: EditorViewModel) {
+        vm.cmdRemoveParagraphAt(insertAt + 2)
+        vm.cmdRemoveParagraphAt(insertAt + 1)
+        vm.cmdRemoveField(insertAt + 2)
+        vm.cmdRemoveField(insertAt + 1)
+        vm.cmdSetFocusedAndPending(prevFocus)
+        vm.cmdAfterMutation()
+    }
+    override fun redo(vm: EditorViewModel) {
+        vm.cmdInsertParagraphAfter(insertAt, imagePara)
+        vm.cmdInsertParagraphAfter(insertAt + 1, textPara)
+        vm.cmdAddField((insertAt + 1).coerceAtMost(vm.fields.size), TextFieldValue(""))
+        vm.cmdAddField((insertAt + 2).coerceAtMost(vm.fields.size), TextFieldValue(""))
+        vm.cmdSetFocusedAndPending(insertAt + 2)
+        vm.cmdAfterMutation()
+    }
+}
+
+/** Sticky-style flags applied to the next typed run when a style toggle is invoked with an empty selection. */
+enum class StickyStyle { BOLD, ITALIC, UNDERLINE, STRIKETHROUGH, COLOR, SIZE }
 
 class EditorViewModel(
     private val noteId: Int?,
@@ -101,6 +228,15 @@ class EditorViewModel(
 
     var loaded by mutableStateOf(noteId == null || noteId <= 0)
         private set
+
+    // ── Undo / redo command stacks (todo 7) ──
+    private val undoStack = ArrayDeque<EditorCommand>()
+    private val redoStack = ArrayDeque<EditorCommand>()
+
+    // ── Sticky style (todo 7): applied to the next typed run when a toggle is invoked with an empty selection ──
+    private var stickyStyles: Set<StickyStyle> = emptySet()
+    private var stickyColor: String? = null
+    private var stickySizeScale: Float = 1f
 
     init {
         fields.add(TextFieldValue(""))
@@ -158,10 +294,11 @@ class EditorViewModel(
             json.decodeFromString<List<String>>(handle.get<String>(KEY_TAGS).orEmpty())
         }.getOrDefault(emptyList())
 
+        val (wc, cc) = documentStats()
         _uiState.value = EditorUiState(
             title = title, excerpt = excerpt, date = date,
             weatherKey = weather, moodKey = mood, coverImagePath = cover,
-            tagNames = tags, wordCount = computeWordCount()
+            tagNames = tags, wordCount = wc, charCount = cc
         )
         return true
     }
@@ -171,7 +308,7 @@ class EditorViewModel(
         handle[KEY_DOC] = json.encodeToString(RichDocument.serializer(), document.toModel())
         val sels = fields.map { DraftSelection(it.text, it.selection.start, it.selection.end) }
         handle[KEY_SELS] = json.encodeToString(ListSerializer(DraftSelection.serializer()), sels)
-        _uiState.update { it.copy(wordCount = computeWordCount()) }
+        refreshDocumentStats()
     }
 
     private fun loadNote() = viewModelScope.launch {
@@ -183,10 +320,11 @@ class EditorViewModel(
         fields.clear()
         document.paragraphs.forEach { fields.add(TextFieldValue(it.text)) }
         if (fields.isEmpty()) fields.add(TextFieldValue(""))
+        val (wc, cc) = documentStats()
         _uiState.value = EditorUiState(
             title = note.title, excerpt = note.excerpt, date = note.date,
             weatherKey = note.weather, moodKey = note.mood, coverImagePath = note.coverImagePath,
-            wordCount = computeWordCount()
+            wordCount = wc, charCount = cc
         )
         loaded = true
         persistDocumentDraft()
@@ -232,15 +370,34 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
     }
 
     // ── Editing-buffer mutators (fields/focusedIndex/pendingFocusIndex stay mutableState) ──
-    fun onFocus(index: Int) { focusedIndex = index }
+    fun onFocus(index: Int) {
+        focusedIndex = index
+        refreshStyleAtCursor()
+    }
 
     fun onTextChange(index: Int, newValue: TextFieldValue) {
         if (index !in document.paragraphs.indices) ensureCapacity(index + 1)
-        val para = document.paragraphs[index]
-        val updated = para.afterTextChange(newValue.text)
-        updateParagraph(index, updated)
+        val beforePara = document.paragraphs[index]
+        val beforeField = fields[index]
+        val afterTextChange = beforePara.afterTextChange(newValue.text)
+
+        // Sticky style: apply to the inserted range, then clear the sticky set.
+        var finalPara = afterTextChange
+        if (stickyStyles.isNotEmpty() && newValue.text.length > beforePara.text.length) {
+            val (insStart, insEnd) = computeInsertedRange(beforePara.text, newValue.text)
+            if (insEnd > insStart) {
+                var styled = afterTextChange
+                for (st in stickyStyles) styled = applySticky(st, styled, insStart, insEnd)
+                finalPara = styled
+            }
+            stickyStyles = emptySet()
+            stickyColor = null
+            stickySizeScale = 1f
+        }
+
+        updateParagraph(index, finalPara)
         fields[index] = newValue
-        persistDocumentDraft()
+        commit(ReplaceCmd(index, beforePara, finalPara, beforeField, newValue))
     }
 
     /**
@@ -250,49 +407,60 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
     fun splitParagraph(index: Int, beforeText: String, afterText: String) {
         val para = document.paragraphs.getOrNull(index) ?: return
         val splitPoint = beforeText.length.coerceIn(0, para.text.length)
+        val originalPara = para
+        val originalField = fields[index]
+        val prevFocus = focusedIndex
         val (before, after) = para.splitAt(splitPoint)
+        val beforeField = TextFieldValue(before.text, TextRange(before.text.length))
+        val afterField = TextFieldValue(after.text, TextRange(after.text.length.coerceAtLeast(0)))
         updateParagraph(index, before)
         insertParagraphAfter(index, after)
-        fields[index] = TextFieldValue(before.text, TextRange(before.text.length))
-        fields.add(index + 1, TextFieldValue(after.text, TextRange(after.text.length.coerceAtLeast(0))))
+        fields[index] = beforeField
+        fields.add(index + 1, afterField)
         focusedIndex = index + 1
         pendingFocusIndex = index + 1
-        persistDocumentDraft()
+        commit(SplitCmd(index, originalPara, before, after, originalField, beforeField, afterField, prevFocus))
     }
 
     /**
      * Merge paragraph [index] into the previous paragraph (backspace at start).
      * Requests focus on the merged paragraph with cursor at the join point.
+     *
+     * Image-paragraph merges are NOT recorded (file deletion is permanent — re-inserting the
+     * paragraph would point at a missing image). Only text↔text merges push an undo command.
      */
     fun mergeWithPrevious(index: Int) {
         if (index <= 0) return
         val prev = document.paragraphs[index - 1]
         val cur = document.paragraphs[index]
+        val prevFocus = focusedIndex
         if (cur.image != null) {
             // image paragraph: just remove it, keep focus on previous
             removeImageParagraph(index)
             focusedIndex = index - 1
             pendingFocusIndex = index - 1
-            persistDocumentDraft()
+            afterMutation()
             return
         }
         if (prev.image != null) {
             // previous is image: merge skips it, focus on the text paragraph before it
-            // simplest: just remove the image paragraph, stay on current
             removeImageParagraph(index - 1)
             focusedIndex = index - 1
             pendingFocusIndex = index - 1
-            persistDocumentDraft()
+            afterMutation()
             return
         }
+        val prevField = fields[index - 1]
+        val curField = fields[index]
         val joinCursor = prev.text.length
         val merged = prev.merge(cur)
+        val mergedField = TextFieldValue(merged.text, TextRange(joinCursor))
         updateParagraph(index - 1, merged)
         removeParagraphInternal(index)
-        fields[index - 1] = TextFieldValue(merged.text, TextRange(joinCursor))
+        if (fields.size > index - 1) fields[index - 1] = mergedField
         focusedIndex = index - 1
         pendingFocusIndex = index - 1
-        persistDocumentDraft()
+        commit(MergeCmd(index, prev, cur, merged, prevField, curField, mergedField, prevFocus))
     }
 
     fun consumePendingFocus() { pendingFocusIndex = -1 }
@@ -307,14 +475,16 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         fields[lastTextIndex] = TextFieldValue(text, TextRange(text.length))
         focusedIndex = lastTextIndex
         pendingFocusIndex = lastTextIndex
-        persistDocumentDraft()
+        afterMutation()
     }
 
     fun setParagraphStyle(index: Int, style: ParagraphStyle) {
-        if (index in document.paragraphs.indices) {
-            updateParagraph(index, document.paragraphs[index].copy(style = style))
-            persistDocumentDraft()
-        }
+        if (index !in document.paragraphs.indices) return
+        val beforePara = document.paragraphs[index]
+        if (beforePara.style == style) return
+        val afterPara = beforePara.copy(style = style)
+        updateParagraph(index, afterPara)
+        commit(ReplaceCmd(index, beforePara, afterPara))
     }
 
     private fun currentSelection(): Pair<Int, TextRange>? {
@@ -324,22 +494,42 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         return i to sel
     }
 
-    fun toggleBold() = applyToSelection { p, s, e -> p.toggleBold(s, e) }
-    fun toggleItalic() = applyToSelection { p, s, e -> p.toggleItalic(s, e) }
-    fun toggleUnderline() = applyToSelection { p, s, e -> p.toggleUnderline(s, e) }
-    fun toggleStrikethrough() = applyToSelection { p, s, e -> p.toggleStrikethrough(s, e) }
-    fun setColor(color: String) = applyToSelection { p, s, e -> p.setColor(s, e, color) }
-    fun setFontSizeScale(scale: Float) = applyToSelection { p, s, e -> p.setFontSizeScale(s, e, scale) }
+    fun toggleBold() = applyToSelection(StickyStyle.BOLD) { p, s, e -> p.toggleBold(s, e) }
+    fun toggleItalic() = applyToSelection(StickyStyle.ITALIC) { p, s, e -> p.toggleItalic(s, e) }
+    fun toggleUnderline() = applyToSelection(StickyStyle.UNDERLINE) { p, s, e -> p.toggleUnderline(s, e) }
+    fun toggleStrikethrough() = applyToSelection(StickyStyle.STRIKETHROUGH) { p, s, e -> p.toggleStrikethrough(s, e) }
+    fun setColor(color: String) = applyToSelection(StickyStyle.COLOR, colorArg = color) { p, s, e -> p.setColor(s, e, color) }
+    fun setFontSizeScale(scale: Float) = applyToSelection(StickyStyle.SIZE, scaleArg = scale) { p, s, e -> p.setFontSizeScale(s, e, scale) }
 
-    private inline fun applyToSelection(transform: (EditorParagraph, Int, Int) -> EditorParagraph) {
+    /**
+     * Apply a span [transform] to the current selection. When the selection is EMPTY, instead of a
+     * no-op, set the corresponding [stickyStyle] flag — the next typed run picks up the style
+     * (applied in [onTextChange]) and the sticky set is cleared. Toggling the same sticky style
+     * twice removes it.
+     */
+    private inline fun applyToSelection(
+        stickyStyle: StickyStyle,
+        colorArg: String? = null,
+        scaleArg: Float = 1f,
+        transform: (EditorParagraph, Int, Int) -> EditorParagraph
+    ) {
         val (i, sel) = currentSelection() ?: return
         val para = document.paragraphs[i]
         val s = minOf(sel.start, sel.end).coerceAtLeast(0)
         val e = maxOf(sel.start, sel.end).coerceAtMost(para.text.length)
-        if (s == e) return
+        if (s == e) {
+            // Empty selection → sticky style for the next typed run
+            stickyStyles = if (stickyStyle in stickyStyles) stickyStyles - stickyStyle else stickyStyles + stickyStyle
+            val stickyOn = stickyStyle in stickyStyles
+            if (stickyStyle == StickyStyle.COLOR) stickyColor = if (stickyOn) colorArg else null
+            if (stickyStyle == StickyStyle.SIZE) stickySizeScale = if (stickyOn) scaleArg else 1f
+            refreshStyleAtCursor()
+            return
+        }
+        val beforePara = para
         val updated = transform(para, s, e)
         updateParagraph(i, updated)
-        persistDocumentDraft()
+        commit(ReplaceCmd(i, beforePara, updated))
     }
 
     fun insertImageAfter(index: Int, sourceUri: android.net.Uri) {
@@ -349,22 +539,137 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         android.graphics.BitmapFactory.decodeFile(path, opts)
         val img = InlineImage(path, opts.outWidth.coerceAtLeast(1), opts.outHeight.coerceAtLeast(1))
         val insertAt = index.coerceAtMost(document.size - 1)
+        val prevFocus = focusedIndex
+        val imagePara = EditorParagraph(image = img)
+        val textPara = EditorParagraph()
         // Insert image paragraph
-        insertParagraphAfter(insertAt, EditorParagraph(image = img))
+        insertParagraphAfter(insertAt, imagePara)
         fields.add((insertAt + 1).coerceAtMost(fields.size), TextFieldValue(""))
         // Auto-insert an empty text paragraph after the image so the user can continue typing
-        insertParagraphAfter(insertAt + 1, EditorParagraph())
+        insertParagraphAfter(insertAt + 1, textPara)
         fields.add((insertAt + 2).coerceAtMost(fields.size), TextFieldValue(""))
         // Focus the text paragraph after the image
         focusedIndex = insertAt + 2
         pendingFocusIndex = insertAt + 2
-        persistDocumentDraft()
+        commit(ImageInsertCmd(insertAt, imagePara, textPara, prevFocus))
     }
 
+    /** Remove an image paragraph. NOT reversible (the image file is permanently deleted). */
     fun removeImageParagraph(index: Int) {
         document.paragraphs.getOrNull(index)?.image?.let { imageStore.delete(it.path) }
         removeParagraphInternal(index)
+        afterMutation()
+    }
+
+    // ── Undo / redo engine (todo 7) ────────────────────────────────────────────────
+
+    /** Undo the last mutation. A no-op (no crash) when the undo stack is empty. */
+    fun undo() {
+        val cmd = undoStack.removeLastOrNull() ?: return
+        cmd.undo(this)
+        redoStack.addLast(cmd)
+        refreshUndoRedoState()
+    }
+
+    /** Redo the last undone mutation. A no-op (no crash) when the redo stack is empty. */
+    fun redo() {
+        val cmd = redoStack.removeLastOrNull() ?: return
+        cmd.redo(this)
+        undoStack.addLast(cmd)
+        refreshUndoRedoState()
+    }
+
+    /** Push a command onto the undo stack, clear the redo stack, cap history at [MAX_HISTORY]. */
+    private fun pushCommand(cmd: EditorCommand) {
+        undoStack.addLast(cmd)
+        while (undoStack.size > MAX_HISTORY) undoStack.removeFirst()
+        redoStack.clear()
+        refreshUndoRedoState()
+    }
+
+    /** Apply a command: mutate → push → persist + refresh style. Used by public mutators. */
+    private fun commit(cmd: EditorCommand) {
+        pushCommand(cmd)
+        afterMutation()
+    }
+
+    /** Persist the draft + refresh styleAtCursor (used after every mutation, public or via command). */
+    private fun afterMutation() {
         persistDocumentDraft()
+        refreshStyleAtCursor()
+    }
+
+    private fun refreshUndoRedoState() {
+        _uiState.update { it.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
+    }
+
+    private fun refreshStyleAtCursor() {
+        _uiState.update { it.copy(styleAtCursor = computeStyleAtCursor()) }
+    }
+
+    /** The merged [SpanStyle] of the span under the cursor (null for an empty paragraph). */
+    private fun computeStyleAtCursor(): SpanStyle? {
+        val i = focusedIndex
+        if (i !in document.paragraphs.indices) return null
+        val pos = fields.getOrNull(i)?.selection?.start ?: return null
+        return document.paragraphs[i].spanAt(pos)?.toSpanStyle()
+    }
+
+    /**
+     * Apply a sticky style to a range. Sticky style SETS the style on (does NOT toggle) — when the
+     * inserted chars already inherited the predecessor's style via [afterTextChange], toggling would
+     * wrongly remove it. Setting force-on matches the sticky semantics ("the next typed run WILL
+     * have this style").
+     */
+    private fun applySticky(st: StickyStyle, p: EditorParagraph, s: Int, e: Int): EditorParagraph {
+        val transform: (RichSpan) -> RichSpan = when (st) {
+            StickyStyle.BOLD -> { it -> it.copy(bold = true) }
+            StickyStyle.ITALIC -> { it -> it.copy(italic = true) }
+            StickyStyle.UNDERLINE -> { it -> it.copy(underline = true) }
+            StickyStyle.STRIKETHROUGH -> { it -> it.copy(strikethrough = true) }
+            StickyStyle.COLOR -> { it -> it.copy(color = stickyColor) }
+            StickyStyle.SIZE -> { it -> it.copy(fontSizeScale = stickySizeScale) }
+        }
+        return p.withSpanToggled(s, e, transform)
+    }
+
+    /** Compute the inserted char range [start, end) from an old→new text transition. */
+    private fun computeInsertedRange(oldText: String, newText: String): Pair<Int, Int> {
+        var p = 0
+        while (p < oldText.length && p < newText.length && oldText[p] == newText[p]) p++
+        var sfx = 0
+        while (sfx < (oldText.length - p) && sfx < (newText.length - p) &&
+            oldText[oldText.length - 1 - sfx] == newText[newText.length - 1 - sfx]) sfx++
+        return p to (newText.length - sfx)
+    }
+
+    // ── Internal helpers used by [EditorCommand] undo/redo (internal so the private
+    //     top-level command classes in this file can call them without `inner` classes) ──
+
+    internal fun cmdUpdateParagraph(index: Int, p: EditorParagraph) {
+        if (index in document.paragraphs.indices) updateParagraph(index, p)
+    }
+    internal fun cmdInsertParagraphAfter(index: Int, p: EditorParagraph) {
+        insertParagraphAfter(index, p)
+    }
+    internal fun cmdRemoveParagraphAt(index: Int) {
+        removeParagraphInternal(index)
+    }
+    internal fun cmdSetField(index: Int, f: TextFieldValue) {
+        if (index in fields.indices) fields[index] = f
+    }
+    internal fun cmdAddField(index: Int, f: TextFieldValue) {
+        fields.add(index.coerceIn(0, fields.size), f)
+    }
+    internal fun cmdRemoveField(index: Int) {
+        if (fields.size > index) fields.removeAt(index)
+    }
+    internal fun cmdSetFocusedAndPending(focus: Int) {
+        focusedIndex = focus
+        pendingFocusIndex = focus
+    }
+    internal fun cmdAfterMutation() {
+        afterMutation()
     }
 
     fun save(onDone: () -> Unit) = viewModelScope.launch {
@@ -431,13 +736,20 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         }
     }
 
-    /** Word count from the document plain text. Recomputed after every document mutation. */
-    private fun computeWordCount(): Int {
+    /** Word + char count from the document plain text. Recomputed after every document mutation. */
+    private fun documentStats(): Pair<Int, Int> {
         val text = document.toModel().plainText()
-        return if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).size
+        val wc = if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).size
+        return wc to text.length
+    }
+
+    private fun refreshDocumentStats() {
+        val (wc, cc) = documentStats()
+        _uiState.update { it.copy(wordCount = wc, charCount = cc) }
     }
 
     private companion object {
+        const val MAX_HISTORY = 100
         const val KEY_DOC = "draftDoc"
         const val KEY_SELS = "draftSelections"
         const val KEY_TITLE = "draftTitle"
