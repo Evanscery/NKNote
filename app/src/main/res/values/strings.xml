@@ -9,6 +9,12 @@
     <string name="nav_trash">回收站</string>
     <string name="nav_settings">设置</string>
     <string name="drawer_greeting">你好，今天过得怎么样？</string>
+    <string name="drawer_section_journal">日记</string>
+    <string name="drawer_section_tools">工具</string>
+    <string name="drawer_section_system">系统</string>
+    <string name="settings_export_progress">正在导出…</string>
+    <string name="settings_export_done">已导出：%1$s</string>
+    <string name="settings_export_failed">导出失败</string>
 
     <!-- Tools -->
     <string name="tools_title">工具箱</string>

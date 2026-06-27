@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
 import io.github.nknote.ui.components.NkTopAppBar
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
@@ -59,7 +60,7 @@ fun ImportPage(
             topBar = {
                 NkTopAppBar(
                     title = stringResource(R.string.import_title),
-                    onBack = nav.back
+                    drawerState = LocalDrawerState.current
                 )
             }
         ) { padding ->

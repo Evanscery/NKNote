@@ -39,6 +39,7 @@ import io.github.nknote.ui.components.NkEmptyState
 import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.components.nkListPadding
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkIconSize
 import io.github.nknote.ui.theme.NkNoteTheme
@@ -61,7 +62,7 @@ fun TrashPage(
             topBar = {
                 NkTopAppBar(
                     title = stringResource(R.string.trash_title),
-                    onBack = nav.back,
+                    drawerState = LocalDrawerState.current,
                     actions = {
                         if (notes.isNotEmpty()) {
                             IconButton(onClick = { showClear = true }) {

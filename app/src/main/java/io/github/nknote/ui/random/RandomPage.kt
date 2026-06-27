@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.nknote.R
 import io.github.nknote.ui.components.NkTopAppBar
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
@@ -59,7 +60,7 @@ fun RandomPage(nav: NkNoteNavigation) {
             topBar = {
                 NkTopAppBar(
                     title = stringResource(R.string.random_title),
-                    onBack = nav.back
+                    drawerState = LocalDrawerState.current
                 )
             },
             bottomBar = {

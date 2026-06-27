@@ -4,4 +4,8 @@
     <files-path
         name="images"
         path="images/" />
+    <!-- Settings export writes to getExternalFilesDir()/nknote-export-<ts>.json. -->
+    <external-files-path
+        name="exports"
+        path="." />
 </paths>

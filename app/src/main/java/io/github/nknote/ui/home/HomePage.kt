@@ -18,11 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,16 +54,15 @@ import io.github.nknote.model.Mood
 import io.github.nknote.model.RichDocument
 import io.github.nknote.model.Weather
 import io.github.nknote.ui.components.MoodIconMap
-import io.github.nknote.ui.components.NkDrawer
-import io.github.nknote.ui.components.NkDrawerItem
 import io.github.nknote.ui.components.NkEmptyState
 import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.WeatherIconMap
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkIconSize
-import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 private val documentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -78,38 +76,21 @@ fun HomePage(
 ) {
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
+    // The global drawer state is hoisted to NkNoteApp; the hamburger in the custom HomeTopBar
+    // opens it. (Home has a search field so it can't reuse NkTopAppBar.)
+    val drawerState: DrawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
 
-    NkNoteTheme {
-        NkDrawer(
-            items = listOf(
-                NkDrawerItem(stringResource(R.string.nav_home), Icons.Filled.Tune),
-                NkDrawerItem(stringResource(R.string.nav_explore), Icons.Filled.Explore),
-                NkDrawerItem(stringResource(R.string.nav_trash), Icons.Filled.DeleteOutline),
-                NkDrawerItem(stringResource(R.string.tools_title), Icons.Filled.Build),
-                NkDrawerItem(stringResource(R.string.nav_settings), Icons.Filled.Settings)
-            ),
-            onSelect = { index ->
-                when (index) {
-                    1 -> nav.toExplore()
-                    2 -> nav.toTrash()
-                    3 -> nav.toTools()
-                    4 -> nav.toSettings()
-                }
-            },
-            content = { drawerToggle ->
-                HomeContent(
-                    notes = notes,
-                    query = query,
-                    onQueryChange = { query = it; viewModel.setQuery(it) },
-                    onNewNote = { nav.toEditor(null) },
-                    onOpenNote = openNote,
-                    onTrash = { viewModel.moveToTrash(it) },
-                    onOpenMenu = drawerToggle,
-                    onOpenCalendar = { nav.toCalendar() }
-                )
-            }
-        )
-    }
+    HomeContent(
+        notes = notes,
+        query = query,
+        onQueryChange = { query = it; viewModel.setQuery(it) },
+        onNewNote = { nav.toEditor(null) },
+        onOpenNote = openNote,
+        onTrash = { viewModel.moveToTrash(it) },
+        onOpenMenu = { scope.launch { drawerState.open() } },
+        onOpenCalendar = { nav.toCalendar() }
+    )
 }
 
 @Composable
@@ -171,7 +152,7 @@ private fun HomeTopBar(
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = NkSpacing.sm, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.Tune, null) }
+                IconButton(onClick = onOpenMenu) { Icon(Icons.Filled.Menu, null) }
                 Text(
                     text = stringResource(R.string.home_title),
                     style = MaterialTheme.typography.headlineSmall,

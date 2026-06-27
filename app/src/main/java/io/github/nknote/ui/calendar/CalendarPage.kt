@@ -44,6 +44,7 @@ import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
 import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.home.HomeViewModel
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
@@ -73,7 +74,7 @@ fun CalendarPage(
             topBar = {
                 NkTopAppBar(
                     title = stringResource(R.string.calendar_title),
-                    onBack = nav.back
+                    drawerState = LocalDrawerState.current
                 )
             }
         ) { padding ->

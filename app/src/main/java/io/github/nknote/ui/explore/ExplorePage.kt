@@ -41,6 +41,7 @@ import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.components.nkListPadding
+import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkIconSize
 import io.github.nknote.ui.theme.NkNoteTheme
@@ -63,7 +64,7 @@ fun ExplorePage(
             topBar = {
                 NkTopAppBar(
                     title = stringResource(R.string.explore_title),
-                    onBack = nav.back
+                    drawerState = LocalDrawerState.current
                 )
             }
         ) { padding ->

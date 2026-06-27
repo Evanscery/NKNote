@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 private val LightColors = lightColorScheme(
@@ -61,9 +62,18 @@ private val DarkColors = darkColorScheme(
     scrim = Color(0xCC000000)
 )
 
+/**
+ * Resolved dark-theme flag provided by [io.github.nknote.ui.navigation.NkNoteApp] from
+ * [io.github.nknote.core.AppContainer.themeMode]. Per-screen [NkNoteTheme] calls read this as
+ * their default so they inherit the user's choice instead of re-reading the system value (which
+ * would override the Settings toggle). `null` (no provider present, e.g. previews / tests) falls
+ * back to the system dark setting, preserving standalone `NkNoteTheme { ... }` behavior.
+ */
+val LocalDarkTheme = staticCompositionLocalOf<Boolean?> { null }
+
 @Composable
 fun NkNoteTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = LocalDarkTheme.current ?: isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     // Intentionally NOT using dynamicColor: the brand palette is part of the identity,
