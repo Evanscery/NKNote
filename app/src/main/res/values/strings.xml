@@ -79,6 +79,9 @@
     <string name="viewer_title">图片预览</string>
     <string name="viewer_delete">删除图片</string>
     <string name="viewer_delete_confirm">确定删除这张图片吗？</string>
+    <string name="viewer_share">分享图片</string>
+    <string name="viewer_share_failed">无法分享图片</string>
+    <string name="viewer_image_info">%1$d × %2$d · %3$s</string>
 
     <!-- Trash -->
     <string name="trash_title">回收站</string>

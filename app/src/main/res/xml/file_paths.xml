@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Image store writes to filesDir/images/<noteId>/<sha256>.webp (see AndroidImageStore). -->
+    <files-path
+        name="images"
+        path="images/" />
+</paths>
