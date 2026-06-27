@@ -80,16 +80,15 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
-import io.github.nknote.appContainer
 import io.github.nknote.model.Mood
 import io.github.nknote.model.ParagraphAlignment
 import io.github.nknote.model.ParagraphStyle
@@ -116,13 +115,10 @@ fun EditorPage(
     noteId: Int?,
     nav: NkNoteNavigation,
     viewModel: EditorViewModel = viewModel(
-        factory = AppViewModelFactory.editorFactory(
-            noteId ?: -1,
-            LocalContext.current.appContainer().imageStore,
-            LocalContext.current.appContainer().noteRepository
-        )
+        factory = AppViewModelFactory.editorFactory(noteId ?: -1)
     )
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDate by remember { mutableStateOf(false) }
     var showWeather by remember { mutableStateOf(false) }
     var showMood by remember { mutableStateOf(false) }
@@ -130,8 +126,8 @@ fun EditorPage(
     var showFontSize by remember { mutableStateOf(false) }
     var detailsExpanded by remember { mutableStateOf(false) }
 
-    val weatherLabel = Weather.fromKey(viewModel.weatherKey)?.let { stringResource(WeatherIconMap.labelRes(it)) }.orEmpty()
-    val moodLabel = Mood.fromKey(viewModel.moodKey)?.let { stringResource(MoodIconMap.labelRes(it)) }.orEmpty()
+    val weatherLabel = Weather.fromKey(uiState.weatherKey)?.let { stringResource(WeatherIconMap.labelRes(it)) }.orEmpty()
+    val moodLabel = Mood.fromKey(uiState.moodKey)?.let { stringResource(MoodIconMap.labelRes(it)) }.orEmpty()
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.insertImageAfter(viewModel.focusedIndex, uri)
@@ -146,7 +142,7 @@ fun EditorPage(
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     EditorTopBar(
-                        title = viewModel.title,
+                        title = uiState.title,
                         onTitleChange = { viewModel.updateTitle(it) },
                         onBack = nav.back,
                         onSave = { viewModel.save { nav.toHomeAndClear() } },
@@ -155,14 +151,14 @@ fun EditorPage(
                     )
                     AnimatedVisibility(visible = detailsExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                         MetaPanel(
-                            title = viewModel.title,
+                            title = uiState.title,
                             onTitle = { viewModel.updateTitle(it) },
-                            excerpt = viewModel.excerpt,
+                            excerpt = uiState.excerpt,
                             onExcerpt = { viewModel.updateExcerpt(it) },
                             weatherLabel = weatherLabel,
                             moodLabel = moodLabel,
-                            date = viewModel.date,
-                            coverImagePath = viewModel.coverImagePath,
+                            date = uiState.date,
+                            coverImagePath = uiState.coverImagePath,
                             onPickCoverImage = { coverImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onRemoveCoverImage = { viewModel.removeCoverImage() },
                             onPickWeather = { showWeather = true },
@@ -191,7 +187,7 @@ fun EditorPage(
         }
     }
 
-    if (showDate) NkDatePicker(initial = viewModel.date, onDate = { viewModel.updateDate(it); showDate = false }, onDismiss = { showDate = false })
+    if (showDate) NkDatePicker(initial = uiState.date, onDate = { viewModel.updateDate(it); showDate = false }, onDismiss = { showDate = false })
     if (showWeather) WeatherPickerDialog(onPick = { viewModel.updateWeather(it); showWeather = false }, onDismiss = { showWeather = false })
     if (showMood) MoodPickerDialog(onPick = { viewModel.updateMood(it); showMood = false }, onDismiss = { showMood = false })
     if (showColor) ColorPickerDialog(onPick = { viewModel.setColor(it); showColor = false }, onDismiss = { showColor = false })

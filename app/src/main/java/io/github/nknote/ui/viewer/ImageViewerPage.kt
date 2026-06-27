@@ -29,18 +29,22 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
-import io.github.nknote.appContainer
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageViewerPage(imagePath: String, nav: NkNoteNavigation) {
+fun ImageViewerPage(
+    imagePath: String,
+    nav: NkNoteNavigation,
+    viewModel: ImageViewerViewModel = viewModel(factory = AppViewModelFactory.factory)
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val context = androidx.compose.ui.platform.LocalContext.current
 
     NkNoteTheme {
         Scaffold(
@@ -51,7 +55,7 @@ fun ImageViewerPage(imagePath: String, nav: NkNoteNavigation) {
                     navigationIcon = { IconButton(onClick = nav.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
                     actions = {
                         IconButton(onClick = {
-                            context.appContainer().imageStore.delete(imagePath)
+                            viewModel.delete(imagePath)
                             nav.back()
                         }) { Icon(Icons.Filled.DeleteOutline, stringResource(R.string.viewer_delete)) }
                     },

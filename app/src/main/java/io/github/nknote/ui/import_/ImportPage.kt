@@ -19,59 +19,38 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
-import io.github.nknote.appContainer
-import io.github.nknote.data.importer.TextImporter
 import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportPage(nav: NkNoteNavigation) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+fun ImportPage(
+    nav: NkNoteNavigation,
+    viewModel: ImportViewModel = viewModel(factory = AppViewModelFactory.factory)
+) {
+    val result by viewModel.result.collectAsStateWithLifecycle()
+    val successMsg = stringResource(R.string.import_success)
+    val status: String? = when (val r = result) {
+        ImportViewModel.Result.Success -> successMsg
+        is ImportViewModel.Result.Failed -> stringResource(R.string.import_failed, r.message)
+        else -> null
+    }
+    val busy = result is ImportViewModel.Result.Busy
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        busy = true
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-                        ?: error("Cannot read file")
-                    // Extract a usable filename from the URI
-                    val name = runCatching {
-                        val cursor = context.contentResolver.query(uri, null, null, null, null)
-                        cursor?.use { c ->
-                            if (c.moveToFirst()) c.getString(c.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME)) else null
-                        } ?: "imported.txt"
-                    }.getOrDefault("imported.txt")
-                    val note = TextImporter.parse(name, text)
-                    context.appContainer().noteRepository.insertNote(note)
-                    context.getString(R.string.import_success)
-                }.getOrElse { context.getString(R.string.import_failed, it.message ?: "error") }
-            }
-            status = result
-            busy = false
-        }
+        if (uri != null) viewModel.import(uri)
     }
 
     NkNoteTheme {
