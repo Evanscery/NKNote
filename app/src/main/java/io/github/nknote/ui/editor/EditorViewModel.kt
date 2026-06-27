@@ -1,4 +1,4 @@
-package io.github.nknote.ui.editor
+﻿package io.github.nknote.ui.editor
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -13,6 +13,7 @@ import io.github.nknote.data.entity.Tag
 import io.github.nknote.data.image.ImageStore
 import io.github.nknote.data.repository.NoteRepository
 import io.github.nknote.model.InlineImage
+import io.github.nknote.model.NkPalette
 import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.RichDocument
 import io.github.nknote.ui.editor.richtext.EditorDocument
@@ -42,7 +43,7 @@ class EditorViewModel(
 
     var title by mutableStateOf("")
         private set
-    var description by mutableStateOf("")
+    var excerpt by mutableStateOf("")
         private set
     var date by mutableStateOf(LocalDate.now().toString())
         private set
@@ -76,7 +77,7 @@ class EditorViewModel(
         val id = noteId ?: return@launch
         val note = repo.getNote(id) ?: run { loaded = true; return@launch }
         title = note.title
-        description = note.description
+        excerpt = note.excerpt
         date = note.date
         weatherKey = note.weather
         moodKey = note.mood
@@ -92,7 +93,7 @@ class EditorViewModel(
     }
 
     fun updateTitle(v: String) { title = v }
-    fun updateDescription(v: String) { description = v }
+    fun updateExcerpt(v: String) { excerpt = v }
     fun updateDate(v: String) { date = v }
     fun updateWeather(key: String) { weatherKey = key }
     fun updateMood(key: String) { moodKey = key }
@@ -247,12 +248,12 @@ class EditorViewModel(
         // Prefer user-set cover; fall back to first inline image
         val resolvedCover = coverImagePath ?: model.paragraphs.firstNotNullOfOrNull { it.image }?.path
         val note = (existing ?: Note(
-            title = title, description = description, content = content,
+            title = title, excerpt = excerpt, content = content,
             date = date, weather = weatherKey, mood = moodKey,
             coverImagePath = resolvedCover,
             createdAt = now, updatedAt = now
         )).copy(
-            title = title, description = description, content = content,
+            title = title, excerpt = excerpt, content = content,
             date = date, weather = weatherKey, mood = moodKey,
             coverImagePath = resolvedCover,
             updatedAt = now, version = (existing?.version ?: 1) + 1
@@ -270,7 +271,7 @@ class EditorViewModel(
     private suspend fun persistTags(noteId: Int) {
         val ids = tagNames.map { name ->
             val id = "tag:" + name.hashCode().toUInt().toString()
-            repo.upsertTag(Tag(id, name, "#5E7A6E", System.currentTimeMillis()))
+            repo.upsertTag(Tag(id, name, NkPalette.defaultTagColor, System.currentTimeMillis()))
             id
         }
         repo.setNoteTags(noteId, ids)

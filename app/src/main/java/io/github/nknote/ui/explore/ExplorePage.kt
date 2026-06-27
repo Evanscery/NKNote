@@ -42,7 +42,9 @@ import io.github.nknote.R
 import io.github.nknote.data.entity.Note
 import io.github.nknote.model.Mood
 import io.github.nknote.model.Weather
+import io.github.nknote.ui.components.MoodIconMap
 import io.github.nknote.ui.components.NkNoteCard
+import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 
@@ -127,8 +129,8 @@ private fun ExploreRow(note: Note, onClick: () -> Unit) {
             Text(note.title.ifBlank { stringResource(R.string.common_no_title) }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Weather.fromKey(note.weather)?.let { Icon(it.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) }
-                Mood.fromKey(note.mood)?.let { Icon(it.icon, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(15.dp)) }
+                Weather.fromKey(note.weather)?.let { Icon(WeatherIconMap.icon(it), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) }
+                Mood.fromKey(note.mood)?.let { Icon(MoodIconMap.icon(it), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(15.dp)) }
                 Text(note.date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

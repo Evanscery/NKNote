@@ -55,9 +55,11 @@ import io.github.nknote.data.entity.Note
 import io.github.nknote.model.Mood
 import io.github.nknote.model.RichDocument
 import io.github.nknote.model.Weather
+import io.github.nknote.ui.components.MoodIconMap
 import io.github.nknote.ui.components.NkDrawer
 import io.github.nknote.ui.components.NkDrawerItem
 import io.github.nknote.ui.components.NkNoteCard
+import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import kotlinx.serialization.json.Json
@@ -212,7 +214,7 @@ private fun NoteCard(note: Note, onClick: () -> Unit, onTrash: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = note.description.ifBlank { plainPreview(note.content) }.ifBlank { stringResource(R.string.common_no_description) },
+                    text = note.excerpt.ifBlank { plainPreview(note.content) }.ifBlank { stringResource(R.string.common_no_description) },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -224,10 +226,10 @@ private fun NoteCard(note: Note, onClick: () -> Unit, onTrash: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     Weather.fromKey(note.weather)?.let {
-                        Icon(it.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                        Icon(WeatherIconMap.icon(it), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
                     }
                     Mood.fromKey(note.mood)?.let {
-                        Icon(it.icon, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(15.dp))
+                        Icon(MoodIconMap.icon(it), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(15.dp))
                     }
                     Text(note.date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

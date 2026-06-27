@@ -95,8 +95,10 @@ import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.Weather
 import io.github.nknote.ui.components.ColorPickerDialog
 import io.github.nknote.ui.components.FontSizePickerDialog
+import io.github.nknote.ui.components.MoodIconMap
 import io.github.nknote.ui.components.MoodPickerDialog
 import io.github.nknote.ui.components.NkDialog
+import io.github.nknote.ui.components.WeatherIconMap
 import io.github.nknote.ui.components.WeatherPickerDialog
 import io.github.nknote.ui.editor.richtext.SpanVisualTransformation
 import io.github.nknote.ui.navigation.NkNoteNavigation
@@ -125,8 +127,8 @@ fun EditorPage(
     var showFontSize by remember { mutableStateOf(false) }
     var detailsExpanded by remember { mutableStateOf(false) }
 
-    val weatherLabel = Weather.fromKey(viewModel.weatherKey)?.let { stringResource(it.labelRes) }.orEmpty()
-    val moodLabel = Mood.fromKey(viewModel.moodKey)?.let { stringResource(it.labelRes) }.orEmpty()
+    val weatherLabel = Weather.fromKey(viewModel.weatherKey)?.let { stringResource(WeatherIconMap.labelRes(it)) }.orEmpty()
+    val moodLabel = Mood.fromKey(viewModel.moodKey)?.let { stringResource(MoodIconMap.labelRes(it)) }.orEmpty()
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.insertImageAfter(viewModel.focusedIndex, uri)
@@ -152,8 +154,8 @@ fun EditorPage(
                         MetaPanel(
                             title = viewModel.title,
                             onTitle = { viewModel.updateTitle(it) },
-                            description = viewModel.description,
-                            onDescription = { viewModel.updateDescription(it) },
+                            excerpt = viewModel.excerpt,
+                            onExcerpt = { viewModel.updateExcerpt(it) },
                             weatherLabel = weatherLabel,
                             moodLabel = moodLabel,
                             date = viewModel.date,
@@ -242,8 +244,8 @@ private fun EditorTopBar(
 private fun MetaPanel(
     title: String,
     onTitle: (String) -> Unit,
-    description: String,
-    onDescription: (String) -> Unit,
+    excerpt: String,
+    onExcerpt: (String) -> Unit,
     weatherLabel: String,
     moodLabel: String,
     date: String,
@@ -264,7 +266,7 @@ private fun MetaPanel(
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
-                value = description, onValueChange = onDescription,
+                value = excerpt, onValueChange = onExcerpt,
                 placeholder = { Text(stringResource(R.string.editor_description_placeholder)) },
                 label = { Text(stringResource(R.string.editor_description)) },
                 shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()

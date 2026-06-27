@@ -39,9 +39,9 @@ fun WeatherPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                     modifier = Modifier.padding(2.dp)
                 ) {
                     Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(w.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(24.dp))
+                        Icon(WeatherIconMap.icon(w), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(24.dp))
                         Spacer(Modifier.height(6.dp))
-                        Text(stringResource(w.labelRes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(WeatherIconMap.labelRes(w)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -66,9 +66,9 @@ fun MoodPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                     modifier = Modifier.padding(2.dp)
                 ) {
                     Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(m.icon, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.height(24.dp))
+                        Icon(MoodIconMap.icon(m), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.height(24.dp))
                         Spacer(Modifier.height(6.dp))
-                        Text(stringResource(m.labelRes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(MoodIconMap.labelRes(m)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }

@@ -1,4 +1,4 @@
-package io.github.nknote.ui.home
+﻿package io.github.nknote.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -62,7 +62,7 @@ class HomeViewModel(private val repo: NoteRepository) : ViewModel() {
     private fun matchesQuery(note: Note, q: String): Boolean {
         val needle = q.trim()
         if (needle.isEmpty()) return true
-        if (note.title.contains(needle, true) || note.description.contains(needle, true)) return true
+        if (note.title.contains(needle, true) || note.excerpt.contains(needle, true)) return true
         // Search the plain text of the RichDocument, not raw JSON
         val plain = runCatching {
             json.decodeFromString<io.github.nknote.model.RichDocument>(note.content).plainText()

@@ -1,4 +1,4 @@
-package io.github.nknote.data.importer
+﻿package io.github.nknote.data.importer
 
 import io.github.nknote.data.entity.Note
 import io.github.nknote.model.ParagraphStyle
@@ -47,7 +47,7 @@ object TextImporter {
         val today = java.time.LocalDate.now().toString()
         return Note(
             title = title,
-            description = paragraphs.firstNotNullOfOrNull { it.spans.firstOrNull { s -> s.text.isNotBlank() } }?.text?.take(80).orEmpty(),
+            excerpt = paragraphs.firstNotNullOfOrNull { it.spans.firstOrNull { s -> s.text.isNotBlank() } }?.text?.take(80).orEmpty(),
             content = json.encodeToString(RichDocument.serializer(), RichDocument(paragraphs)),
             date = today,
             createdAt = now,

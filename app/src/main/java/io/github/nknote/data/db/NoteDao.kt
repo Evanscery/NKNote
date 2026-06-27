@@ -28,7 +28,7 @@ interface NoteDao {
         SELECT * FROM notes
         WHERE isDeleted = 0 AND (
             title LIKE '%' || :query || '%' OR
-            description LIKE '%' || :query || '%' OR
+            excerpt LIKE '%' || :query || '%' OR
             content LIKE '%' || :query || '%'
         )
         ORDER BY date DESC, updatedAt DESC

@@ -18,7 +18,7 @@ data class Note(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val title: String,
-    val description: String,
+    val excerpt: String,
     val content: String,            // serialized RichDocument JSON
     val date: String,               // "yyyy-MM-dd"
     val weather: String = "",      // Weather.key, "" = none
