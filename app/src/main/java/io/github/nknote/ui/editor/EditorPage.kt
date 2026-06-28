@@ -151,8 +151,6 @@ fun EditorPage(
     var showMood by remember { mutableStateOf(false) }
     var showColor by remember { mutableStateOf(false) }
     var showFontSize by remember { mutableStateOf(false) }
-    var showLink by remember { mutableStateOf(false) }
-    var showFind by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
     var overflowExpanded by remember { mutableStateOf(false) }
     var detailsExpanded by remember { mutableStateOf(false) }
