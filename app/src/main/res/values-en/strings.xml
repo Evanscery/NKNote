@@ -106,6 +106,9 @@
     <string name="viewer_title">Image preview</string>
     <string name="viewer_delete">Delete image</string>
     <string name="viewer_delete_confirm">Delete this image?</string>
+    <string name="viewer_share">Share image</string>
+    <string name="viewer_share_failed">Could not share image</string>
+    <string name="viewer_image_info">%1$d × %2$d · %3$s</string>
 
     <!-- Trash -->
     <string name="trash_title">Trash</string>
