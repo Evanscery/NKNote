@@ -16,6 +16,7 @@ import io.github.nknote.data.image.ImageStore
 import io.github.nknote.data.repository.NoteRepository
 import io.github.nknote.model.InlineImage
 import io.github.nknote.model.NkPalette
+import io.github.nknote.model.ParagraphAlignment
 import io.github.nknote.model.ParagraphStyle
 import io.github.nknote.model.RichDocument
 import io.github.nknote.model.RichSpan
@@ -35,11 +36,14 @@ import io.github.nknote.ui.editor.richtext.toggleItalic
 import io.github.nknote.ui.editor.richtext.toggleStrikethrough
 import io.github.nknote.ui.editor.richtext.toggleUnderline
 import io.github.nknote.ui.editor.richtext.withSpanToggled
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -57,7 +61,11 @@ import java.time.LocalDate
  *
  * `canUndo` / `canRedo` reflect the [EditorViewModel] command stacks; `styleAtCursor` is the merged
  * [SpanStyle] of the span under the cursor (null when the cursor is in an empty paragraph);
- * `wordCount` / `charCount` are derived from [RichDocument.plainText].
+ * `paragraphStyleAtCursor` / `paragraphAlignmentAtCursor` / `indentLevelAtCursor` mirror the
+ * focused paragraph's paragraph-level formatting so the FormatBar (todo 10) can highlight the
+ * active heading / list / alignment / indent affordance. `wordCount` / `charCount` are derived
+ * from [RichDocument.plainText]. `linkAtCursor` / `codeAtCursor` drive the Link / Code button
+ * active-states (todo 11); `findMatches` / `findIndex` drive the Find-in-page bar (todo 11).
  */
 data class EditorUiState(
     val title: String = "",
@@ -70,9 +78,25 @@ data class EditorUiState(
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val styleAtCursor: SpanStyle? = null,
+    val paragraphStyleAtCursor: ParagraphStyle = ParagraphStyle.BODY,
+    val paragraphAlignmentAtCursor: ParagraphAlignment = ParagraphAlignment.START,
+    val indentLevelAtCursor: Int = 0,
     val wordCount: Int = 0,
-    val charCount: Int = 0
+    val charCount: Int = 0,
+    val linkAtCursor: Boolean = false,
+    val codeAtCursor: Boolean = false,
+    val findMatches: List<MatchLocation> = emptyList(),
+    val findIndex: Int = -1
 )
+
+/**
+ * A single find-in-page match: the paragraph index plus the half-open `[start, end)` range of the
+ * matched substring within that paragraph's *raw* text (the marker / indent prefix is NOT counted
+ * — the renderer shifts by `markerPrefixLength` when laying the highlight over the transformed
+ * string). Computed by [EditorViewModel.searchInDocument] via plain [String.indexOf] (no regex
+ * engine — by plan constraint, todo 11).
+ */
+data class MatchLocation(val paragraphIndex: Int, val start: Int, val end: Int)
 
 /**
  * Per-paragraph selection snapshot persisted to [SavedStateHandle]. `TextFieldValue` itself is not
@@ -229,6 +253,27 @@ class EditorViewModel(
     var loaded by mutableStateOf(noteId == null || noteId <= 0)
         private set
 
+    /**
+     * Monotonic counter bumped on every document / meta edit. The [EditorPage] watches this via a
+     * `LaunchedEffect` to fire a *debounced* autosave (3 s after the last edit). It starts at 0 and
+     * is never bumped on [restoreFromHandle] / [loadNote], so a fresh load does NOT trigger an
+     * immediate autosave.
+     */
+    var editVersion by mutableStateOf(0)
+        private set
+
+    // ── Autosave race guard (load-bearing) ──
+    /**
+     * Serializes [save] so a manual save and a concurrent ON_STOP / debounced autosave can't both
+     * observe the "new note" branch and create duplicate rows. The first save of a brand-new note
+     * (`noteId <= 0`) calls [NoteRepository.insertNote] and records the returned id in
+     * [savedNoteId]; every subsequent save calls [NoteRepository.updateNote] with that id — never
+     * `insertNote` again.
+     */
+    private val saveMutex = Mutex()
+    /** The DB row id after the first save of a new note; non-null from the moment a row exists. */
+    private var savedNoteId: Int? = noteId?.takeIf { it > 0 }
+
     // ── Undo / redo command stacks (todo 7) ──
     private val undoStack = ArrayDeque<EditorCommand>()
     private val redoStack = ArrayDeque<EditorCommand>()
@@ -337,11 +382,11 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
     }
 
     // ── Meta mutators (observable state → StateFlow + handle) ──────────────────────
-    fun updateTitle(v: String) { _uiState.update { it.copy(title = v) }; handle[KEY_TITLE] = v }
-    fun updateExcerpt(v: String) { _uiState.update { it.copy(excerpt = v) }; handle[KEY_EXCERPT] = v }
-    fun updateDate(v: String) { _uiState.update { it.copy(date = v) }; handle[KEY_DATE] = v }
-    fun updateWeather(key: String) { _uiState.update { it.copy(weatherKey = key) }; handle[KEY_WEATHER] = key }
-    fun updateMood(key: String) { _uiState.update { it.copy(moodKey = key) }; handle[KEY_MOOD] = key }
+    fun updateTitle(v: String) { _uiState.update { it.copy(title = v) }; handle[KEY_TITLE] = v; markEdited() }
+    fun updateExcerpt(v: String) { _uiState.update { it.copy(excerpt = v) }; handle[KEY_EXCERPT] = v; markEdited() }
+    fun updateDate(v: String) { _uiState.update { it.copy(date = v) }; handle[KEY_DATE] = v; markEdited() }
+    fun updateWeather(key: String) { _uiState.update { it.copy(weatherKey = key) }; handle[KEY_WEATHER] = key; markEdited() }
+    fun updateMood(key: String) { _uiState.update { it.copy(moodKey = key) }; handle[KEY_MOOD] = key; markEdited() }
 
     fun setCoverImage(uri: android.net.Uri) {
         val targetNoteId = noteId ?: -1
@@ -349,11 +394,13 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         _uiState.value.coverImagePath?.let { imageStore.delete(it) }
         _uiState.update { it.copy(coverImagePath = path) }
         handle[KEY_COVER] = path
+        markEdited()
     }
     fun removeCoverImage() {
         _uiState.value.coverImagePath?.let { imageStore.delete(it) }
         _uiState.update { it.copy(coverImagePath = null) }
         handle[KEY_COVER] = null
+        markEdited()
     }
 
     fun addTag(name: String) {
@@ -363,11 +410,16 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
             if (n in st.tagNames) st else st.copy(tagNames = st.tagNames + n)
         }
         handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiState.value.tagNames)
+        markEdited()
     }
     fun removeTag(name: String) {
         _uiState.update { it.copy(tagNames = it.tagNames - name) }
         handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiState.value.tagNames)
+        markEdited()
     }
+
+    /** Bump [editVersion] so the [EditorPage] debounced-autosave effect restarts its 3 s timer. */
+    private fun markEdited() { editVersion++ }
 
     // ── Editing-buffer mutators (fields/focusedIndex/pendingFocusIndex stay mutableState) ──
     fun onFocus(index: Int) {
@@ -487,11 +539,154 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         commit(ReplaceCmd(index, beforePara, afterPara))
     }
 
+    /** Set the focused paragraph's text alignment (Left/Center/Right). Reversible via the undo stack. */
+    fun setParagraphAlignment(index: Int, alignment: ParagraphAlignment) {
+        if (index !in document.paragraphs.indices) return
+        val beforePara = document.paragraphs[index]
+        if (beforePara.alignment == alignment) return
+        val afterPara = beforePara.copy(alignment = alignment)
+        updateParagraph(index, afterPara)
+        commit(ReplaceCmd(index, beforePara, afterPara))
+    }
+
+    /**
+     * Adjust the focused paragraph's indent level by [delta], clamped to `0..3`. Indent (+1) /
+     * outdent (-1) at the boundary is a no-op (never negative, never above 3) rather than a crash.
+     * Reversible via the undo stack.
+     */
+    fun setIndentLevel(index: Int, delta: Int) {
+        if (index !in document.paragraphs.indices) return
+        val beforePara = document.paragraphs[index]
+        val newLevel = (beforePara.indentLevel + delta).coerceIn(0, 3)
+        if (newLevel == beforePara.indentLevel) return
+        val afterPara = beforePara.copy(indentLevel = newLevel)
+        updateParagraph(index, afterPara)
+        commit(ReplaceCmd(index, beforePara, afterPara))
+    }
+
     private fun currentSelection(): Pair<Int, TextRange>? {
         val i = focusedIndex
         if (i !in document.paragraphs.indices) return null
         val sel = fields.getOrNull(i)?.selection ?: return null
         return i to sel
+    }
+
+    /**
+     * Set a hyperlink [url] on the span covering the current selection. Requires a NON-empty
+     * selection (linking zero characters is a no-op — the user must first select the text to
+     * turn into a link). Reversible via the undo stack. The renderer underlines the span and
+     * emits a `UrlAnnotation` (clickable in the viewer) — see [RichSpan.url] / todo 4.
+     */
+    fun setLinkOnSelection(url: String) {
+        val u = url.trim()
+        if (u.isEmpty()) return
+        val (i, sel) = currentSelection() ?: return
+        val para = document.paragraphs[i]
+        val s = minOf(sel.start, sel.end).coerceAtLeast(0)
+        val e = maxOf(sel.start, sel.end).coerceAtMost(para.text.length)
+        if (s >= e) return  // empty selection → no-op (link needs a non-empty anchor)
+        val beforePara = para
+        val updated = para.withSpanToggled(s, e) { it.copy(url = u) }
+        updateParagraph(i, updated)
+        commit(ReplaceCmd(i, beforePara, updated))
+    }
+
+    /** True when the cursor's span already carries a link (drives the Link button active-state). */
+    fun linkAtCursor(): Boolean = uiState.value.linkAtCursor
+
+    /**
+     * Toggle `ParagraphStyle.CODE` on the focused paragraph. Code paragraphs render with a
+     * monospace `SpanStyle` + a code-block background (todo 4). Toggling off returns to `BODY`.
+     * Reversible via the undo stack.
+     */
+    fun toggleCode() {
+        val i = focusedIndex
+        if (i !in document.paragraphs.indices) return
+        val beforePara = document.paragraphs[i]
+        val newStyle = if (beforePara.style == ParagraphStyle.CODE) ParagraphStyle.BODY else ParagraphStyle.CODE
+        if (beforePara.style == newStyle) return
+        val afterPara = beforePara.copy(style = newStyle)
+        updateParagraph(i, afterPara)
+        commit(ReplaceCmd(i, beforePara, afterPara))
+    }
+
+    /**
+     * Find every occurrence of [query] across all paragraphs via plain [String.indexOf] (no regex
+     * engine — by plan constraint todo 11). Returns one [MatchLocation] per occurrence, in
+     * document order. An empty query returns an empty list (the UI guards against `MATCH ''`-like
+     * crashes). Non-overlapping matches: each search resumes at `index + query.length`.
+     */
+    fun searchInDocument(query: String): List<MatchLocation> {
+        if (query.isEmpty()) return emptyList()
+        val out = ArrayList<MatchLocation>()
+        document.paragraphs.forEachIndexed { i, p ->
+            val text = p.text
+            var from = 0
+            while (from <= text.length) {
+                val idx = text.indexOf(query, from)
+                if (idx < 0) break
+                out.add(MatchLocation(i, idx, idx + query.length))
+                from = idx + query.length
+            }
+        }
+        return out
+    }
+
+    /**
+     * Run [searchInDocument] for [query], publish the matches to [EditorUiState.findMatches], and
+     * jump to the first match (focus + scroll + selection). Clears state when the query is empty.
+     */
+    fun updateFind(query: String) {
+        val matches = searchInDocument(query)
+        _uiState.update { it.copy(findMatches = matches, findIndex = if (matches.isEmpty()) -1 else 0) }
+        if (matches.isNotEmpty()) navigateToMatch(matches[0])
+    }
+
+    /** Advance to the next find match (wraps around). No-op when there are no matches. */
+    fun findNext() {
+        val st = uiState.value
+        if (st.findMatches.isEmpty()) return
+        val next = (st.findIndex + 1) % st.findMatches.size
+        _uiState.update { it.copy(findIndex = next) }
+        navigateToMatch(st.findMatches[next])
+    }
+
+    /** Advance to the previous find match (wraps around). No-op when there are no matches. */
+    fun findPrev() {
+        val st = uiState.value
+        if (st.findMatches.isEmpty()) return
+        val prev = (st.findIndex - 1 + st.findMatches.size) % st.findMatches.size
+        _uiState.update { it.copy(findIndex = prev) }
+        navigateToMatch(st.findMatches[prev])
+    }
+
+    /** Clear find-in-page state (closes the bar). */
+    fun clearFind() {
+        _uiState.update { it.copy(findMatches = emptyList(), findIndex = -1) }
+    }
+
+    /** Highlights for a single paragraph — consumed by the per-paragraph [SpanVisualTransformation]. */
+    fun findHighlightsForParagraph(index: Int): List<MatchLocation> {
+        val st = uiState.value
+        return if (st.findMatches.isEmpty()) emptyList()
+        else st.findMatches.filter { it.paragraphIndex == index }
+    }
+
+    /**
+     * Focus + scroll to a match and select its range so the user sees it. The scroll-to-focused
+     * path ([EditorPage]'s `pendingFocusIndex` `LaunchedEffect`) animates the paragraph into view.
+     */
+    private fun navigateToMatch(m: MatchLocation) {
+        if (m.paragraphIndex !in document.paragraphs.indices) return
+        val cur = fields.getOrNull(m.paragraphIndex)
+        if (cur != null) {
+            val e = m.end.coerceAtMost(cur.text.length)
+            val s = m.start.coerceAtLeast(0).coerceAtMost(e)
+            fields[m.paragraphIndex] = cur.copy(selection = TextRange(s, e))
+        }
+        focusedIndex = m.paragraphIndex
+        pendingFocusIndex = m.paragraphIndex
+        afterMutation()
     }
 
     fun toggleBold() = applyToSelection(StickyStyle.BOLD) { p, s, e -> p.toggleBold(s, e) }
@@ -597,6 +792,7 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
     private fun afterMutation() {
         persistDocumentDraft()
         refreshStyleAtCursor()
+        markEdited()
     }
 
     private fun refreshUndoRedoState() {
@@ -604,16 +800,49 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
     }
 
     private fun refreshStyleAtCursor() {
-        _uiState.update { it.copy(styleAtCursor = computeStyleAtCursor()) }
+        _uiState.update {
+            val (spanStyle, pStyle, pAlign, pIndent, linkActive) = computeStyleAtCursor()
+            val codeActive = pStyle == ParagraphStyle.CODE
+            it.copy(
+                styleAtCursor = spanStyle,
+                paragraphStyleAtCursor = pStyle,
+                paragraphAlignmentAtCursor = pAlign,
+                indentLevelAtCursor = pIndent,
+                linkAtCursor = linkActive,
+                codeAtCursor = codeActive
+            )
+        }
     }
 
-    /** The merged [SpanStyle] of the span under the cursor (null for an empty paragraph). */
-    private fun computeStyleAtCursor(): SpanStyle? {
+    /**
+     * The merged [SpanStyle] of the span under the cursor (null for an empty paragraph) plus the
+     * focused paragraph's paragraph-level formatting (style / alignment / indent) — consumed by the
+     * FormatBar's active-state highlighting (todo 10). Paragraph-level state is reported even when
+     * the paragraph is empty (so a heading or a numbered list is highlighted on an empty line).
+     * `linkActive` is true when the span under the cursor carries a non-null `RichSpan.url`
+     * (consumed by the Link button active-state, todo 11).
+     */
+    private fun computeStyleAtCursor(): SpanStyleAtCursor {
         val i = focusedIndex
-        if (i !in document.paragraphs.indices) return null
-        val pos = fields.getOrNull(i)?.selection?.start ?: return null
-        return document.paragraphs[i].spanAt(pos)?.toSpanStyle()
+        val para = document.paragraphs.getOrNull(i)
+        if (para == null) {
+            return SpanStyleAtCursor(null, ParagraphStyle.BODY, ParagraphAlignment.START, 0, false)
+        }
+        val pos = fields.getOrNull(i)?.selection?.start
+        val span = pos?.let { para.spanAt(it) }
+        return SpanStyleAtCursor(
+            span?.toSpanStyle(), para.style, para.alignment, para.indentLevel, span?.url != null
+        )
     }
+
+    /** Bundle returned by [computeStyleAtCursor] — span style + paragraph-level state at the cursor. */
+    private data class SpanStyleAtCursor(
+        val span: SpanStyle?,
+        val paragraphStyle: ParagraphStyle,
+        val paragraphAlignment: ParagraphAlignment,
+        val indentLevel: Int,
+        val linkActive: Boolean
+    )
 
     /**
      * Apply a sticky style to a range. Sticky style SETS the style on (does NOT toggle) — when the
@@ -672,33 +901,74 @@ handle[KEY_TAGS] = json.encodeToString(ListSerializer(String.serializer()), _uiS
         afterMutation()
     }
 
-    fun save(onDone: () -> Unit) = viewModelScope.launch {
-        val now = System.currentTimeMillis()
-        val model = document.toModel()
-        val content = json.encodeToString(RichDocument.serializer(), model)
-        val existing = noteId?.let { repo.getNote(it) }
-        val st = _uiState.value
-        // Prefer user-set cover; fall back to first inline image
-        val resolvedCover = st.coverImagePath ?: model.paragraphs.firstNotNullOfOrNull { it.image }?.path
-        val note = (existing ?: Note(
-            title = st.title, excerpt = st.excerpt, content = content,
-            date = st.date, weather = st.weatherKey, mood = st.moodKey,
-            coverImagePath = resolvedCover,
-            createdAt = now, updatedAt = now
-        )).copy(
-            title = st.title, excerpt = st.excerpt, content = content,
-            date = st.date, weather = st.weatherKey, mood = st.moodKey,
-            coverImagePath = resolvedCover,
-            updatedAt = now, version = (existing?.version ?: 1) + 1
-        )
-        if (existing == null) {
-            val newId = repo.insertNote(note)
-            persistTags(newId.toInt())
-        } else {
-            repo.updateNote(note)
-            persistTags(note.id)
+    /**
+     * Persist the current document + meta to the DB. Silent when [onDone] is empty (used by the
+     * autosave paths in [EditorPage]: ON_STOP + the debounced LaunchedEffect). The manual save
+     * button passes an [onDone] that navigates home.
+     *
+     * Race guard (load-bearing): the whole body runs under [saveMutex]. The first save of a
+     * brand-new note (`noteId <= 0` → [savedNoteId] == null) calls [NoteRepository.insertNote] and
+     * records the returned id in [savedNoteId]; every subsequent save calls
+     * [NoteRepository.updateNote] with that id. This prevents a concurrent ON_STOP save + manual
+     * save (or two autosaves) both observing the "new" branch and creating duplicate rows.
+     *
+     * The undo/redo stacks are NOT touched here — they stay in-memory VM state and are
+     * session-scoped (a note reopen starts a fresh stack; documented in todo 13).
+     */
+    fun save(onDone: () -> Unit = {}): Job = viewModelScope.launch {
+        saveMutex.withLock {
+            val now = System.currentTimeMillis()
+            val model = document.toModel()
+            val content = json.encodeToString(RichDocument.serializer(), model)
+            val st = _uiState.value
+            // Prefer user-set cover; fall back to first inline image
+            val resolvedCover = st.coverImagePath ?: model.paragraphs.firstNotNullOfOrNull { it.image }?.path
+            if (savedNoteId == null) {
+                // First save of a new note: insert + record the id.
+                val note = Note(
+                    title = st.title, excerpt = st.excerpt, content = content,
+                    date = st.date, weather = st.weatherKey, mood = st.moodKey,
+                    coverImagePath = resolvedCover,
+                    createdAt = now, updatedAt = now, version = 1
+                )
+                savedNoteId = repo.insertNote(note).toInt()
+                persistTags(savedNoteId!!)
+            } else {
+                // Subsequent save (manual or autosave): update the existing row. NEVER insert again.
+                val existing = repo.getNote(savedNoteId!!)
+                val note = Note(
+                    id = savedNoteId!!,
+                    title = st.title, excerpt = st.excerpt, content = content,
+                    date = st.date, weather = st.weatherKey, mood = st.moodKey,
+                    coverImagePath = resolvedCover,
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                    version = (existing?.version ?: 1) + 1
+                )
+                repo.updateNote(note)
+                persistTags(savedNoteId!!)
+            }
         }
         onDone()
+    }
+
+    /**
+     * Replace the document with the given template (e.g. a chosen [io.github.nknote.data.templates.NoteTemplate]).
+     * Clears the undo/redo stacks: a template application is a wholesale reset, so prior commands
+     * (which pointed at the old paragraphs) no longer apply. Focuses the first paragraph.
+     */
+    fun applyTemplate(doc: RichDocument) {
+        undoStack.clear()
+        redoStack.clear()
+        refreshUndoRedoState()
+        val editor = if (doc.paragraphs.isEmpty()) EditorDocument() else doc.toEditor()
+        document = editor
+        fields.clear()
+        document.paragraphs.forEach { fields.add(TextFieldValue(it.text)) }
+        if (fields.isEmpty()) fields.add(TextFieldValue(""))
+        focusedIndex = 0
+        pendingFocusIndex = 0
+        afterMutation()
     }
 
     private suspend fun persistTags(noteId: Int) {

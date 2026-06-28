@@ -73,13 +73,34 @@
     <string name="editor_format_color">Color</string>
     <string name="editor_format_size">Font size</string>
     <string name="editor_format_heading">Heading</string>
+    <string name="editor_format_title">Title</string>
+    <string name="editor_format_subheading">Subheading</string>
+    <string name="editor_format_body">Body</string>
     <string name="editor_format_quote">Quote</string>
     <string name="editor_format_bullet">List</string>
+    <string name="editor_format_numbered">Numbered list</string>
+    <string name="editor_align_left">Align left</string>
+    <string name="editor_align_center">Align center</string>
+    <string name="editor_align_right">Align right</string>
+    <string name="editor_indent">Indent</string>
+    <string name="editor_outdent">Outdent</string>
     <string name="editor_insert_image">Insert image</string>
+    <string name="editor_format_link">Link</string>
+    <string name="editor_format_code">Code</string>
+    <string name="editor_format_find">Find</string>
+    <string name="editor_link_dialog_title">Insert link</string>
+    <string name="editor_link_url_label">URL</string>
+    <string name="editor_link_apply">Apply</string>
+    <string name="editor_find_placeholder">Find…</string>
+    <string name="editor_find_no_matches">No matches</string>
+    <string name="editor_find_prev">Previous</string>
+    <string name="editor_find_next">Next</string>
     <string name="editor_no_image_selected">No image selected</string>
     <string name="editor_custom_color">Custom color</string>
     <string name="editor_select_color">Pick a color</string>
     <string name="editor_cover_image">Cover image</string>
+    <string name="editor_overflow">More</string>
+    <string name="editor_templates">Templates</string>
 
     <!-- Viewer -->
     <string name="viewer_title">Image preview</string>

@@ -73,13 +73,34 @@
     <string name="editor_format_color">颜色</string>
     <string name="editor_format_size">字号</string>
     <string name="editor_format_heading">标题</string>
+    <string name="editor_format_title">标题样式</string>
+    <string name="editor_format_subheading">子标题</string>
+    <string name="editor_format_body">正文</string>
     <string name="editor_format_quote">引用</string>
     <string name="editor_format_bullet">列表</string>
+    <string name="editor_format_numbered">编号列表</string>
+    <string name="editor_align_left">左对齐</string>
+    <string name="editor_align_center">居中</string>
+    <string name="editor_align_right">右对齐</string>
+    <string name="editor_indent">增加缩进</string>
+    <string name="editor_outdent">减少缩进</string>
     <string name="editor_insert_image">插入图片</string>
+    <string name="editor_format_link">链接</string>
+    <string name="editor_format_code">代码</string>
+    <string name="editor_format_find">查找</string>
+    <string name="editor_link_dialog_title">插入链接</string>
+    <string name="editor_link_url_label">链接地址</string>
+    <string name="editor_link_apply">应用</string>
+    <string name="editor_find_placeholder">查找…</string>
+    <string name="editor_find_no_matches">无匹配</string>
+    <string name="editor_find_prev">上一个</string>
+    <string name="editor_find_next">下一个</string>
     <string name="editor_no_image_selected">未选择图片</string>
     <string name="editor_custom_color">自定义颜色</string>
     <string name="editor_select_color">选择颜色</string>
     <string name="editor_cover_image">封面图片</string>
+    <string name="editor_overflow">更多操作</string>
+    <string name="editor_templates">模板</string>
 
     <!-- Viewer -->
     <string name="viewer_title">图片预览</string>

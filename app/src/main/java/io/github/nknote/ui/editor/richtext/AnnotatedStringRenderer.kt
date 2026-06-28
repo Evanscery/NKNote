@@ -41,6 +41,17 @@ fun parseHexColor(hex: String?): Color? {
 /** Fallback code-block background when no theme color is supplied (e.g. in non-Composable tests). */
 val DefaultCodeBackground: Color = Color(0xFFEEEEEE)
 
+/** Fallback find-in-page highlight color (translucent yellow) when no theme color is supplied. */
+val DefaultHighlightColor: Color = Color(0x66FFEB3B)
+
+/**
+ * A find-in-page highlight range, in *raw paragraph text* coordinates (end-exclusive). The
+ * renderer shifts each range by `markerPrefixLength` when laying the highlight over the
+ * transformed (marker + indent + text) string. Kept in the richtext package so the renderer
+ * does not depend on the editor ViewModel's `MatchLocation`.
+ */
+data class HighlightRange(val start: Int, val end: Int)
+
 /**
  * Convert this [RichSpan] to a Compose [SpanStyle]. Public so [io.github.nknote.ui.editor.EditorViewModel]
  * can reuse it for the active-style-at-cursor query (`EditorUiState.styleAtCursor`) — keeping the
@@ -103,11 +114,17 @@ fun EditorParagraph.markerPrefixLength(numberedCounter: Int = 1): Int =
  * `RichSpan.url` is emitted as a [UrlAnnotation] (clickable when rendered via `ClickableText`
  * or `BasicText` with a `linkInteractionHandler`; underlined here via [RichSpan.toSpanStyle]).
  * `ParagraphStyle.CODE` is rendered as a monospace [SpanStyle] with a code-block background.
+ *
+ * [highlights] lays a translucent yellow background over find-in-page match ranges (raw-text
+ * coordinates, end-exclusive). They are added as a post-pass `addStyle` over the already-built
+ * string, shifted by the marker-prefix length so they align with the raw text in the visual.
  */
 @OptIn(ExperimentalTextApi::class)
 fun EditorParagraph.toAnnotatedString(
     numberedCounter: Int = 1,
-    codeBackground: Color = DefaultCodeBackground
+    codeBackground: Color = DefaultCodeBackground,
+    highlights: List<HighlightRange> = emptyList(),
+    highlightColor: Color = DefaultHighlightColor
 ): AnnotatedString {
     val base = baseStyleFor(style, codeBackground)
     val marker = marker(numberedCounter)
@@ -133,5 +150,15 @@ fun EditorParagraph.toAnnotatedString(
             }
         }
         pop()
+        // Find-in-page highlight overlay: raw-text [start, end) → transformed [start+prefixLen, end+prefixLen).
+        if (highlights.isNotEmpty()) {
+            val prefixLen = indent.length + marker.length
+            val textLen = this@toAnnotatedString.text.length
+            for (h in highlights) {
+                val s = (h.start + prefixLen).coerceIn(prefixLen, prefixLen + textLen)
+                val e = (h.end + prefixLen).coerceIn(s, prefixLen + textLen)
+                if (e > s) addStyle(SpanStyle(background = highlightColor), s, e)
+            }
+        }
     }
 }

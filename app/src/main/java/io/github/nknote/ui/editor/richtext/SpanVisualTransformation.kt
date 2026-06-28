@@ -2,6 +2,7 @@ package io.github.nknote.ui.editor.richtext
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
@@ -21,11 +22,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 class SpanVisualTransformation(
     private val paragraph: EditorParagraph,
     private val numberedCounter: Int = 1,
-    private val codeBackground: Color = DefaultCodeBackground
+    private val codeBackground: Color = DefaultCodeBackground,
+    private val highlights: List<HighlightRange> = emptyList(),
+    private val highlightColor: Color = DefaultHighlightColor
 ) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val styled = if (paragraph.text == text.text) {
-            paragraph.toAnnotatedString(numberedCounter, codeBackground)
+            paragraph.toAnnotatedString(numberedCounter, codeBackground, highlights, highlightColor)
         } else {
             buildStyledFromText(text.text, paragraph.spans)
         }
@@ -45,14 +48,14 @@ class SpanVisualTransformation(
     private fun buildStyledFromText(text: String, spans: List<io.github.nknote.model.RichSpan>): AnnotatedString {
         if (text.isEmpty()) {
             // Empty paragraph still shows the marker (e.g. an empty bullet line shows "•  ").
-            return paragraph.toAnnotatedString(numberedCounter, codeBackground)
+            return paragraph.toAnnotatedString(numberedCounter, codeBackground, highlights, highlightColor)
         }
         // Fallback when the live field text doesn't exactly match the paragraph's stored text
         // (e.g. mid-keystroke): render plain text but still prepend the marker prefix so the
-        // visual stays consistent with sibling paragraphs.
+        // visual stays consistent with sibling paragraphs. Find highlights are overlaid too.
         val covered = spans.sumOf { it.text.length }
         return if (covered == text.length) {
-            paragraph.toAnnotatedString(numberedCounter, codeBackground)
+            paragraph.toAnnotatedString(numberedCounter, codeBackground, highlights, highlightColor)
         } else {
             buildAnnotatedString {
                 val marker = paragraph.marker(numberedCounter)
@@ -62,6 +65,16 @@ class SpanVisualTransformation(
                     append(marker)
                 }
                 append(text)
+                // Overlay find highlights (shift by prefix length, clamp to text bounds).
+                if (highlights.isNotEmpty()) {
+                    val prefixLen = indent.length + marker.length
+                    val textLen = text.length
+                    for (h in highlights) {
+                        val s = (h.start + prefixLen).coerceIn(prefixLen, prefixLen + textLen)
+                        val e = (h.end + prefixLen).coerceIn(s, prefixLen + textLen)
+                        if (e > s) addStyle(SpanStyle(background = highlightColor), s, e)
+                    }
+                }
             }
         }
     }
