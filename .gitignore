@@ -30,5 +30,6 @@ hs_err_pid*
 # Signing / secrets
 *.keystore
 *.jks
+*.p12
 keystore.properties
 secrets.properties
