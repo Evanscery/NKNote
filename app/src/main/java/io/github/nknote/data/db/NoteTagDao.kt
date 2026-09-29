@@ -19,6 +19,12 @@ abstract class NoteTagDao {
     @Query("SELECT n.* FROM notes n INNER JOIN note_tags nt ON n.id = nt.noteId WHERE nt.tagId = :tagId AND n.isDeleted = 0 ORDER BY n.date DESC")
     abstract fun observeNotesForTag(tagId: String): Flow<List<Note>>
 
+    @Query("SELECT * FROM note_tags")
+    abstract fun observeAll(): Flow<List<NoteTag>>
+
+    @Query("SELECT * FROM note_tags")
+    abstract suspend fun getAll(): List<NoteTag>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insert(noteTag: NoteTag)
 

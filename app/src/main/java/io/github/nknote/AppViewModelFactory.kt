@@ -7,10 +7,13 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.nknote.core.AppContainer
+import io.github.nknote.ui.calendar.CalendarViewModel
 import io.github.nknote.ui.editor.EditorViewModel
 import io.github.nknote.ui.explore.ExploreViewModel
 import io.github.nknote.ui.home.HomeViewModel
 import io.github.nknote.ui.import_.ImportViewModel
+import io.github.nknote.ui.reader.NoteReadViewModel
+import io.github.nknote.ui.settings.SettingsViewModel
 import io.github.nknote.ui.trash.TrashViewModel
 import io.github.nknote.ui.viewer.ImageViewerViewModel
 
@@ -32,10 +35,15 @@ object AppViewModelFactory {
 
     val factory = viewModelFactory {
         initializer { HomeViewModel(container(this).noteRepository) }
+        initializer { CalendarViewModel(container(this).noteRepository) }
         initializer { TrashViewModel(container(this).noteRepository) }
         initializer { ExploreViewModel(container(this).noteRepository) }
-        initializer { ImportViewModel(application(), container(this).noteRepository) }
+        initializer {
+            val c = container(this)
+            ImportViewModel(application(), c.noteRepository, c.backupManager)
+        }
         initializer { ImageViewerViewModel(application(), container(this).imageStore) }
+        initializer { SettingsViewModel(application(), container(this).backupManager) }
     }
 
     /**
@@ -47,6 +55,13 @@ object AppViewModelFactory {
         initializer {
             val c = container(this)
             EditorViewModel(noteId, c.imageStore, c.noteRepository, createSavedStateHandle())
+        }
+    }
+
+    /** Factory for the read-only note view. */
+    fun readerFactory(noteId: Int) = viewModelFactory {
+        initializer {
+            NoteReadViewModel(noteId, container(this).noteRepository)
         }
     }
 }

@@ -21,11 +21,6 @@ class ImageViewerViewModel(
     private val imageStore: ImageStore
 ) : AndroidViewModel(application) {
 
-    companion object {
-        /** FileProvider authority. Wired in the manifest by todo 8. */
-        const val FILE_PROVIDER_AUTHORITY = "io.github.nknote.fileprovider"
-    }
-
     /** Delete the image file at [path] from disk. Swallows failures (file may already be gone). */
     fun delete(path: String) {
         runCatching { imageStore.delete(path) }
@@ -34,12 +29,16 @@ class ImageViewerViewModel(
     /**
      * Build an `ACTION_SEND` intent carrying the image at [path] via a `FileProvider` content URI,
      * with `FLAG_GRANT_READ_URI_PERMISSION` so the receiving app can read it. Returns `null` if the
-     * file is missing or the provider isn't configured (caller shows a toast instead of crashing).
+     * file is missing or the provider isn't configured (caller shows a snackbar instead of crashing).
+     *
+     * The authority is derived from the package name — the manifest declares
+     * `${applicationId}.fileprovider`, so a hardcoded constant would break under any
+     * `applicationIdSuffix` (e.g. a debug suffix).
      */
     fun buildShareIntent(path: String): Intent? = runCatching {
-        val file = File(path)
-        if (!file.exists()) return null
-        val uri = FileProvider.getUriForFile(getApplication(), FILE_PROVIDER_AUTHORITY, file)
+        if (!imageStore.exists(path)) return null
+        val app = getApplication<Application>()
+        val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", File(path))
         Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
             putExtra(Intent.EXTRA_STREAM, uri)

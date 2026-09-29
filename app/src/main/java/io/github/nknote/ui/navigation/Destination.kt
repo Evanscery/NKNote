@@ -8,6 +8,10 @@ sealed class Destination(val route: String) {
         const val ARG_NOTE_ID_DEFAULT = "-1"
         const val routeWithArg = "editor/{noteId}"
     }
+    data object Reader : Destination("reader") {
+        const val ARG_NOTE_ID = "noteId"
+        const val routeWithArg = "reader/{noteId}"
+    }
     data object Viewer : Destination("viewer") {
         const val ARG_PATH = "imagePath"
         const val routeWithArg = "viewer/{imagePath}"
@@ -15,7 +19,6 @@ sealed class Destination(val route: String) {
     data object Trash : Destination("trash")
     data object Explore : Destination("explore")
     data object Calendar : Destination("calendar")
-    data object Tools : Destination("tools")
     data object Random : Destination("random")
     data object Settings : Destination("settings")
     data object Import : Destination("import")

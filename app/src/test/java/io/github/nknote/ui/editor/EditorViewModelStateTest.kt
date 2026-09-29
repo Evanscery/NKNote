@@ -94,7 +94,7 @@ class EditorViewModelStateTest {
         // The editing buffer must stay a mutableStateListOf<TextFieldValue> (keystroke latency).
         // After construction there is exactly one blank paragraph field.
         assertEquals(1, vm.fields.size)
-        assertEquals("", vm.fields[0].text)
+        assertEquals("", vm.fields[0].rawText)
         assertEquals(0, vm.focusedIndex)
         assertEquals(-1, vm.pendingFocusIndex)
     }
@@ -135,9 +135,9 @@ class EditorViewModelStateTest {
         assertEquals("hello", vm.paragraphs.first().text)
         assertEquals(1, vm.fields.size)
         val field = vm.fields.first()
-        assertEquals("hello", field.text)
-        assertEquals(5, field.selection.start)
-        assertEquals(5, field.selection.end)
+        assertEquals("hello", field.rawText)
+        assertEquals(5, field.rawSelection.start)
+        assertEquals(5, field.rawSelection.end)
 
         // wordCount was recomputed from the restored document.
         assertEquals(1, st.wordCount)
@@ -175,5 +175,6 @@ class EditorViewModelStateTest {
         override fun delete(path: String) {}
         override fun deleteAllForNote(noteId: Int) {}
         override fun exists(path: String): Boolean = false
+        override fun relocateToNote(path: String, noteId: Int): String = path
     }
 }

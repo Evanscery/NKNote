@@ -58,16 +58,17 @@ NKNote is a **serverless**, **lightweight**, **offline-first** Android diary app
 
 **Image cleanup.** Image files are deleted *only* on permanent-delete (`NoteRepositoryImpl.permanentlyDelete`) and `emptyTrash` (which first reads `NoteDao.getDeletedIds()` then drops the rows, then calls `imageStore.deleteAllForNote(id)` for each id). Soft-delete (`moveToTrash`) deliberately keeps the per-note image folder so a `restoreNote` brings the images back. This invariant is the load-bearing reason `emptyTrash` reads ids *before* deleting rows.
 
-### Rich text: `RichDocument` (v2 schema)
+### Rich text: `RichDocument` (v3 schema)
 
 The portable rich-text schema is the load-bearing design choice for the multi-platform goal. It is a plain Kotlin data model serialized with `kotlinx.serialization`; every field added after v1 carries a default, so legacy JSON decodes without throwing.
 
 ```
 RichDocument
  └─ List<RichParagraph>
-     ├─ style:  TITLE | HEADING | SUBHEADING | BODY | QUOTE | BULLET | NUMBERED | CODE
+     ├─ style:  TITLE | HEADING | SUBHEADING | BODY | QUOTE | BULLET | NUMBERED | CODE | CHECKBOX
      ├─ alignment:  START | CENTER | END
      ├─ indentLevel: Int = 0   (0..3; clamped by the toolbar)
+     ├─ checked: Boolean = false   (v3; meaningful only for CHECKBOX)
      ├─ List<RichSpan>  (a *partition* of the paragraph text)
      │    ├─ text
      │    ├─ bold / italic / underline / strikethrough
@@ -77,7 +78,8 @@ RichDocument
      └─ image: InlineImage?  (path + width + height)
 ```
 
-**v2 additions (this milestone):** `ParagraphStyle.CODE`, `ParagraphAlignment`, `RichParagraph.alignment`, `RichParagraph.indentLevel`, `RichSpan.url`. All carry defaults; the serializer is `ignoreUnknownKeys + encodeDefaults`.
+**v2 additions:** `ParagraphStyle.CODE`, `ParagraphAlignment`, `RichParagraph.alignment`, `RichParagraph.indentLevel`, `RichSpan.url`.
+**v3 additions:** `ParagraphStyle.CHECKBOX` + `RichParagraph.checked` (task lists). All carry defaults; the serializer is `ignoreUnknownKeys + encodeDefaults`. Note the one-way enum caveat: `ignoreUnknownKeys` does not cover unknown enum VALUES, so an old APK decoding a CHECKBOX note falls back to an empty editor document via its `runCatching` guards (no crash, DB JSON untouched).
 
 **Why a partition?** Each span carries the *complete* style for its character run, and spans are non-overlapping and contiguous. This makes style toggling a simple per-character transform (see `ui/editor/richtext/RichEditor.kt`) and keeps the model diff-free and JSON-portable.
 
@@ -98,9 +100,9 @@ Reconciled params: **q75 / 1600 px** (the previous q70 / 1280 px was a stale con
 
 ## MVVM wiring
 
-- **View** = Composable screen (`HomePage`, `EditorPage`, `CalendarPage`, `SettingsPage`, …). Stateless; reads from a ViewModel.
-- **ViewModel** = `HomeViewModel`, `EditorViewModel`, `TrashViewModel`, `ExploreViewModel`, `ImportViewModel`, `ImageViewerViewModel`. Owns `StateFlow` UI state; calls the repository; survives config changes.
-- **Model** = `NoteRepository` (interface) + `NoteRepositoryImpl`; `ImageStore` (interface) + `AndroidImageStore`; `TextImporter`; `SyncEngine`; `NoteTemplates`.
+- **View** = Composable screen (`HomePage`, `NoteReadPage`, `EditorPage`, `CalendarPage`, `SettingsPage`, …). Stateless; reads from a ViewModel.
+- **ViewModel** = `HomeViewModel` (FTS + tag filter pipeline), `NoteReadViewModel` (reactive reader + checkbox persistence), `EditorViewModel`, `CalendarViewModel` (live day markers, `flatMapLatest` day selection), `TrashViewModel`, `ExploreViewModel` (year grouping), `ImportViewModel` (zip/json/txt routing), `SettingsViewModel` (export states), `ImageViewerViewModel`. Owns `StateFlow` UI state; calls the repository; survives config changes.
+- **Model** = `NoteRepository` (interface) + `NoteRepositoryImpl` (derives searchText/monthDay/auto-excerpt); `ImageStore` (interface incl. `relocateToNote`) + `AndroidImageStore`; `TextImporter`; `BackupManager` (zip round-trip); `SyncEngine`; `NoteTemplates`.
 - **DI** = `AppContainer`, created once in `NkNoteApplication`. Exposed to ViewModels via the `AppViewModelFactory` (which takes `AppContainer` and resolves deps internally — no Composable resolves the container).
 
 ### `EditorViewModel` — the load-bearing MVVM split
@@ -114,21 +116,35 @@ This split is intentional; do NOT collapse it.
 
 ### Undo / redo
 
-The editor keeps an `ArrayDeque<EditorCommand>` undo stack and a redo stack (capped at ~100). Each `EditorCommand` carries the before/after state of the region it touched (text edit, span toggle, paragraph-style change, paragraph split/merge, image insert) — *not* raw document snapshots, so the stack stays light even for large documents. Image *removal* is intentionally not reversible (the image file is deleted on removal — re-inserting the paragraph would point at a missing file). The stack is **session-scoped**: it is NOT persisted; reopening a note starts a fresh stack. Saving does not clear the stack.
+The editor keeps an `ArrayDeque<EditorCommand>` undo stack and a redo stack (capped at ~100). Each `EditorCommand` carries the before/after state of the region it touched (text edit, multi-split for Enter/paste, paragraph merge, span toggle, paragraph-style change, image insert) — *not* raw document snapshots. Consecutive single-run insertions (or deletions) on the same paragraph within 800 ms **coalesce into one command** (word/burst-sized undo); whitespace, pauses, cursor moves, focus changes and undo/redo break the chain. Commands maintain the `fields.size == paragraphs.size` invariant: paragraph removal inside commands is paragraph-only, paired with an explicit field removal (the historical double-removal desync crash is structurally excluded, and every editor test asserts parity). Image *removal* is intentionally not reversible. The stack is **session-scoped**; saving does not clear it.
+
+### The sentinel guard (soft-keyboard backspace-merge)
+
+Soft keyboards delete via `InputConnection.deleteSurroundingText` and never dispatch `KEYCODE_DEL`, so a key-event handler cannot detect "backspace at paragraph start". Every text field therefore holds `U+200B + rawText` with the selection kept ≥ 1: deleting the sentinel *does* fire `onValueChange` on every IME, and the ViewModel treats the missing guard with a collapsed caret at raw 0 as the merge signal. The guard never reaches the document model, drafts, word counts, or find coordinates — `fieldOf` / `rawText` / `rawSelection` are the only legal accessors, and `SpanVisualTransformation`'s `OffsetMapping` (guard + list-marker aware) also keeps the visual cursor from ever landing before the sentinel.
 
 ### Autosave + draft
 
-- **Autosave on `Lifecycle.Event.ON_STOP`** + a debounced save (3 s after the last edit, driven by an `editVersion` counter the `EditorPage` watches via `LaunchedEffect`).
-- **`saveMutex`** serializes `save()` so a manual save and a concurrent ON_STOP / debounced autosave can't both observe the "new note" branch and create duplicate rows. The first save of a new note (`noteId == -1`) calls `repo.insertNote` and remembers the returned id in `savedNoteId`; every subsequent save calls `repo.updateNote(note.copy(id = savedNoteId))` — never `insertNote` again.
-- **Draft persistence via `SavedStateHandle`:** `TextFieldValue` is not SavedStateHandle-safe across process death, so the draft stores per-paragraph `(text: String, selectionStart: Int, selectionEnd: Int)` tuples (`DraftSelection`) and the VM reconstructs `TextFieldValue(text, TextRange(start, end))` on restore. Dialog-visibility flags are transient and not persisted.
+- **Autosave on `Lifecycle.Event.ON_STOP`** + a debounced save (3 s after the last edit, driven by an `editVersion` counter the `EditorPage` watches via `LaunchedEffect`). Pure navigation (cursor moves, find-jumps, focus changes) does NOT bump `editVersion`.
+- **Empty-note guard:** a pristine brand-new note (empty document, blank title/excerpt, no cover) never inserts a row — backing out of an untouched editor leaves no junk entry. This replaces a back-confirm dialog (the ON_STOP autosave covers every leave-screen path).
+- **`saveMutex`** serializes `save()` so a manual save and a concurrent ON_STOP / debounced autosave can't both observe the "new note" branch and create duplicate rows. The first save also **re-homes provisional images**: files picked before the first save live under `images/0/` and are moved (`ImageStore.relocateToNote`) into `images/<id>/`, with document + cover paths rewritten.
+- **Draft persistence via `SavedStateHandle`:** the draft stores per-paragraph RAW `(text, selectionStart, selectionEnd)` tuples (`DraftSelection`, never the sentinel guard) and the VM reconstructs guarded `TextFieldValue`s on restore. Dialog-visibility flags are transient and not persisted.
 
 ### Templates
 
 `data/templates/NoteTemplates.kt` ships three built-in starter documents (`Gratitude` — heading + 3 empty bullets; `Daily Log` — heading + empty body; `Free Write` — single empty body paragraph). Picking a template replaces the editor's current document via `EditorViewModel.applyTemplate`. No external template engine.
 
+### Tags
+
+`Tag.id` IS the normalized name (`trim + collapse spaces + lowercase`) — bijective, collision-free, and backup round-trips need zero id remapping; `Tag.name` keeps the display casing and `Tag.colorFor(name)` picks deterministically from `NkPalette.tagPalette` (8 curated colors). The editor's `MetaPanel` has a chip row + inline input; Home shows a `FilterChip` row (query ∧ tag intersect in `HomeViewModel`). Tag lifecycle is automatic: `setNoteTags` / permanent-delete / empty-trash all run `TagDao.deleteOrphans()` — no manage screen.
+
+### Backup (zip)
+
+`data/backup/BackupManager` writes `nknote-backup-<ts>.zip` = `notes.json` (schemaVersion 1: tags[], notes[] with tagIds) + `images/<id>/*.webp`, with all image paths rewritten RELATIVE so the backup survives reinstall. Import stages entries into cacheDir (zip-slip guarded), always inserts as new notes, moves images to `filesDir/images/<newId>/`, rewrites document + cover paths absolute, and reattaches tags. Legacy flat-JSON exports (`LegacyNoteExport`) remain importable. Atomicity is per-note; the outcome is an honest `ImportSummary(imported, failed)`.
+
 ### Other VMs
 
-- **`ImportViewModel`** (`AndroidViewModel`) — `import(fileUri)` reads the file via the Application's `ContentResolver`, parses with `TextImporter`, inserts via `NoteRepository`. Emits a `StateFlow<Result>` (`Idle / Busy / Success / Failed(message)`). The screen no longer touches the repo.
+- **`ImportViewModel`** (`AndroidViewModel`) — `import(fileUri)` routes by file name: `.zip` → `BackupManager.importFromZip`, `.json` → `importLegacyJson`, else `TextImporter`. Emits a `StateFlow<Result>` (`Idle / Busy / Success(imported) / Failed(message)`). The screen no longer touches the repo.
+- **`SettingsViewModel`** (`AndroidViewModel`) — owns the export flow (`ExportState Idle/Running/Done(file)/Failed`); the page fires the share chooser on `Done`.
 - **`ImageViewerViewModel`** (`AndroidViewModel`) — `delete(path)` and `buildShareIntent(path): Intent?`. The share intent uses `FileProvider.getUriForFile(getApplication(), "io.github.nknote.fileprovider", File(path))` with `FLAG_GRANT_READ_URI_PERMISSION`; returns `null` if the file is missing or the provider isn't registered (UI shows a toast instead of crashing). No raw `Context` is passed in.
 
 ## Navigation
@@ -138,15 +154,17 @@ A single `NavHost` in `NkNoteApp`, wrapped by a **global `ModalNavigationDrawer`
 | Route | Screen | Args |
 |---|---|---|
 | `home` | Home | — |
+| `reader/{noteId}` | Reader (read-only note view) | `noteId: Int` |
 | `editor/{noteId}` | Editor | `noteId: Int` (−1 = new) |
 | `viewer/{imagePath}` | Viewer | `imagePath: String` (URL-encoded) |
 | `trash` | Trash | — |
 | `random` | Random | — |
 | `explore` | Explore | — |
 | `calendar` | Calendar | — |
-| `tools` | Tools | — |
 | `settings` | Settings | — |
 | `import` | Import | — |
+
+Opening a note from Home / Explore / Calendar goes to the **reader** first; its edit button pushes the editor, and saving an existing note pops back to the reader (which live-updates via `observeNote`). The former orphaned `tools` hub route was removed (the drawer's Tools section links Random and Import directly). The `NavHost` uses a 250 ms fade-through + 1/16-width slide transition set (`NkMotion` tokens).
 
 Navigation actions are passed as a `NkNoteNavigation` value object, keeping screens decoupled from `NavController`.
 

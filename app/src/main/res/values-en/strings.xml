@@ -5,7 +5,6 @@
     <!-- Navigation drawer -->
     <string name="nav_home">Home</string>
     <string name="nav_explore">Explore</string>
-    <string name="nav_random">Random</string>
     <string name="nav_trash">Trash</string>
     <string name="nav_settings">Settings</string>
     <string name="drawer_greeting">Hello, how was your day?</string>
@@ -17,23 +16,17 @@
     <string name="settings_export_failed">Export failed</string>
 
     <!-- Tools -->
-    <string name="tools_title">Tools</string>
-    <string name="tools_section_utilities">Utilities</string>
-    <string name="random_subtitle">Pick one at random from a list of options</string>
 
     <!-- Settings -->
     <string name="settings_section_data">Data</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_about">About</string>
-    <string name="home_all">All</string>
     <string name="settings_theme">Theme mode</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_language">Language</string>
-    <string name="settings_language_system">System</string>
     <string name="settings_export">Export all notes</string>
-    <string name="settings_export_subtitle">Export as a JSON file</string>
+    <string name="settings_export_subtitle">Export as a .zip backup (with images and tags)</string>
     <string name="settings_about_version">Version</string>
     <string name="settings_about_description">A lightweight, serverless diary app</string>
     <string name="settings_about_github">GitHub repository</string>
@@ -45,7 +38,6 @@
     <string name="home_search_empty">No matching notes</string>
     <string name="home_delete">Move to trash</string>
     <string name="home_today">Today</string>
-    <string name="home_this_day">On this day · %1$s</string>
 
     <!-- Calendar -->
     <string name="calendar_title">Calendar</string>
@@ -62,9 +54,8 @@
     <string name="editor_select_weather">Weather</string>
     <string name="editor_select_mood">Mood</string>
     <string name="editor_save">Save</string>
+    <!-- Intentionally unused: ON_STOP autosave covers back navigation; kept for a possible future opt-in confirm. -->
     <string name="editor_back_confirm">Discard unsaved changes and go back?</string>
-    <string name="editor_confirm">Discard</string>
-    <string name="editor_cancel">Cancel</string>
     <string name="editor_content_placeholder">Start writing…</string>
     <string name="editor_format_bold">Bold</string>
     <string name="editor_format_italic">Italic</string>
@@ -95,8 +86,6 @@
     <string name="editor_find_no_matches">No matches</string>
     <string name="editor_find_prev">Previous</string>
     <string name="editor_find_next">Next</string>
-    <string name="editor_no_image_selected">No image selected</string>
-    <string name="editor_custom_color">Custom color</string>
     <string name="editor_select_color">Pick a color</string>
     <string name="editor_cover_image">Cover image</string>
     <string name="editor_overflow">More</string>
@@ -131,24 +120,62 @@
     <string name="explore_title">Explore</string>
     <string name="explore_on_this_day">On this day, other years</string>
     <string name="explore_this_day_empty">No notes from this day in past years</string>
-    <string name="explore_dates_written">%1$d notes written</string>
     <string name="explore_no_notes">No notes to explore yet</string>
 
     <!-- Import -->
     <string name="import_title">Import</string>
     <string name="import_pick_file">Pick a file</string>
-    <string name="import_hint">Supports .txt files; auto-parsed into notes</string>
-    <string name="import_success">Import succeeded</string>
+    <string name="import_hint">Supports .txt text, .zip backups (with images and tags), and legacy .json exports</string>
     <string name="import_failed">Import failed: %1$s</string>
     <string name="import_progress">Parsing…</string>
+
+    <!-- Added: a11y -->
+    <string name="a11y_open_menu">Open menu</string>
+    <string name="a11y_clear_search">Clear search</string>
+    <string name="a11y_calendar_has_note">Has entry</string>
+
+    <!-- Added: home -->
+    <string name="home_new_entry">New entry</string>
+    <string name="home_trashed_snackbar">Moved to trash</string>
+
+    <!-- Added: trash -->
+    <string name="trash_delete_confirm">Permanently delete this entry? This cannot be undone.</string>
+
+    <!-- Added: calendar -->
+    <string name="calendar_month_format">MMMM yyyy</string>
+
+    <!-- Added: explore -->
+    <string name="explore_header_subtitle">Look back on the days you\'ve written</string>
+    <string name="explore_years_ago">%1$d years ago · %2$d</string>
+    <string name="explore_notes_count">%1$d notes written</string>
+
+    <!-- Added: drawer -->
+    <string name="drawer_subtitle">A gentle place for your days</string>
+
+    <!-- Added: editor -->
+    <string name="editor_delete_image">Delete image</string>
+    <string name="editor_delete_image_confirm">Delete this image? The file will be removed and cannot be restored.</string>
+    <string name="editor_word_char_count">%1$d words · %2$d chars</string>
+    <string name="editor_link_remove">Remove link</string>
+    <string name="editor_format_checkbox">Checklist</string>
+    <string name="editor_format_more">More formatting</string>
+
+    <!-- Added: reader -->
+    <string name="reader_edit">Edit</string>
+
+    <!-- Added: import / backup -->
+    <string name="import_success_count">Imported %1$d notes</string>
+
+    <!-- Added: templates -->
+    <string name="template_gratitude">Gratitude</string>
+    <string name="template_daily_log">Daily Log</string>
+    <string name="template_free_write">Free Write</string>
 
     <!-- Common -->
     <string name="common_back">Back</string>
     <string name="common_close">Close</string>
     <string name="common_confirm">OK</string>
     <string name="common_cancel">Cancel</string>
-    <string name="common_none">None</string>
-    <string name="common_save">Save</string>
     <string name="common_no_title">Untitled</string>
     <string name="common_no_description">No summary for this note</string>
     <string name="common_undo">Undo</string>

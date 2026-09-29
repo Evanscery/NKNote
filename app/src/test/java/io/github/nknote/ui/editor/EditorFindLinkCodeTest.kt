@@ -140,20 +140,50 @@ class EditorFindLinkCodeTest {
         assertEquals(0, st.findIndex)
         // navigateToMatch selects the first match in paragraph 0 ("my diary entry" → "diary" at [3,8)).
         assertEquals(0, vm.focusedIndex)
-        assertEquals(3, vm.fields[0].selection.start)
-        assertEquals(8, vm.fields[0].selection.end)
+        assertEquals(3, vm.fields[0].rawSelection.start)
+        assertEquals(8, vm.fields[0].rawSelection.end)
 
         vm.findNext()
         val st2 = vm.uiState.value
         assertEquals(1, st2.findIndex)
         // The second match is in paragraph 1; focus + selection moved there.
         assertEquals(1, vm.focusedIndex)
-        assertEquals(8, vm.fields[1].selection.start)
-        assertEquals(13, vm.fields[1].selection.end)
+        assertEquals(8, vm.fields[1].rawSelection.start)
+        assertEquals(13, vm.fields[1].rawSelection.end)
 
         vm.findNext()
         // Wraps around back to the first match.
         assertEquals(0, vm.uiState.value.findIndex)
+    }
+
+    @Test
+    fun clearLinkOnSelection_collapsedCursor_removesTheWholeLinkRun() {
+        val vm = EditorViewModel(null, imageStore, repo, SavedStateHandle())
+        vm.onTextChange(0, TextFieldValue("go to site now", TextRange(14, 14)))
+        // Link the word "site" [6, 10).
+        vm.fields[0] = TextFieldValue("go to site now", TextRange(6, 10))
+        vm.setLinkOnSelection("https://x")
+        assertTrue(vm.paragraphs[0].spans.any { it.url != null })
+
+        // Collapse the cursor inside the link, then clear.
+        vm.fields[0] = TextFieldValue("go to site now", TextRange(8, 8))
+        vm.clearLinkOnSelection()
+
+        assertFalse("the whole link run must be un-linked", vm.paragraphs[0].spans.any { it.url != null })
+        assertEquals("go to site now", vm.paragraphs[0].text)
+
+        // Undoable.
+        vm.undo()
+        assertTrue(vm.paragraphs[0].spans.any { it.url != null })
+    }
+
+    @Test
+    fun clearLinkOnSelection_noLinkUnderCursor_isNoOp() {
+        val vm = EditorViewModel(null, imageStore, repo, SavedStateHandle())
+        vm.onTextChange(0, TextFieldValue("plain", TextRange(5, 5)))
+        val canUndoBefore = vm.uiState.value.canUndo
+        vm.clearLinkOnSelection()
+        assertEquals(canUndoBefore, vm.uiState.value.canUndo)
     }
 
     @Test
@@ -173,5 +203,6 @@ class EditorFindLinkCodeTest {
         override fun delete(path: String) {}
         override fun deleteAllForNote(noteId: Int) {}
         override fun exists(path: String): Boolean = false
+        override fun relocateToNote(path: String, noteId: Int): String = path
     }
 }

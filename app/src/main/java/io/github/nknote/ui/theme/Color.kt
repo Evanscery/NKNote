@@ -33,3 +33,9 @@ val CardAltDark = Color(0xFF272319)
 val OutlineDark = Color(0xFF3A352B)
 val ErrorDark = Color(0xFFE0A19A)
 val OnErrorDark = Color(0xFF2A0E0B)
+
+// RGB slider accents (color-picker only). Muted, warm-adjacent hues — R/G/B semantics
+// genuinely need distinct hue, so these are curated tokens rather than inline hex.
+val SliderRedAccent = Color(0xFFB0524A)
+val SliderGreenAccent = Color(0xFF6B8E5A)
+val SliderBlueAccent = Color(0xFF5A6B8E)

@@ -59,6 +59,24 @@ class AndroidImageStore(private val context: Context) : ImageStore {
 
     override fun exists(path: String): Boolean = File(path).exists()
 
+    override fun relocateToNote(path: String, noteId: Int): String {
+        val src = File(path)
+        val targetDir = File(context.filesDir, "images/$noteId")
+        if (src.parentFile == targetDir) return path
+        if (!src.exists()) return path
+        return runCatching {
+            targetDir.mkdirs()
+            val dst = File(targetDir, src.name)
+            // renameTo is atomic on the same filesystem (both live under filesDir).
+            if (src.renameTo(dst)) dst.absolutePath
+            else {
+                src.copyTo(dst, overwrite = true)
+                src.delete()
+                dst.absolutePath
+            }
+        }.getOrDefault(path)
+    }
+
     private fun sampleSizeFor(width: Int, height: Int): Int {
         var sample = 1
         var maxDim = maxOf(width, height)

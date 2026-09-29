@@ -79,7 +79,7 @@ private fun baseStyleFor(style: ParagraphStyle, codeBackground: Color): SpanStyl
     ParagraphStyle.HEADING -> SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
     ParagraphStyle.SUBHEADING -> SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
     ParagraphStyle.QUOTE -> SpanStyle(fontStyle = FontStyle.Italic)
-    ParagraphStyle.BULLET, ParagraphStyle.NUMBERED -> SpanStyle()
+    ParagraphStyle.BULLET, ParagraphStyle.NUMBERED, ParagraphStyle.CHECKBOX -> SpanStyle()
     ParagraphStyle.CODE -> SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground)
     ParagraphStyle.BODY -> SpanStyle()
 }

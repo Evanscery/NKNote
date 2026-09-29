@@ -29,6 +29,19 @@ import io.github.nknote.ui.theme.NkSpacing
  * [EditorViewModel.applyTemplate]. Reachable only from the editor overflow menu on a NEW note
  * (`noteId == null`), so an existing note's content is never silently replaced.
  */
+/**
+ * Localized template titles. The data layer ([NoteTemplates]) stays resource-free (it is
+ * commonMain-shaped), so the key → string-resource mapping lives here in the UI; unknown keys
+ * fall back to the template's built-in English title.
+ */
+@Composable
+private fun templateTitle(template: NoteTemplate): String = when (template.key) {
+    "gratitude" -> stringResource(R.string.template_gratitude)
+    "daily_log" -> stringResource(R.string.template_daily_log)
+    "free_write" -> stringResource(R.string.template_free_write)
+    else -> template.title
+}
+
 @Composable
 fun TemplatePickerDialog(
     onPick: (NoteTemplate) -> Unit,
@@ -59,7 +72,7 @@ fun TemplatePickerDialog(
                         )
                         androidx.compose.foundation.layout.Spacer(Modifier.size(NkSpacing.sm))
                         Text(
-                            text = template.title,
+                            text = templateTitle(template),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

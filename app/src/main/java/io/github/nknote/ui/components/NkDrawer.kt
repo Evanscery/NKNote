@@ -1,8 +1,6 @@
 package io.github.nknote.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.nknote.R
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
 
@@ -56,12 +56,12 @@ fun NkDrawerSheet(sections: List<NkDrawerSection>) {
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "NKNote",
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "A gentle place for your days",
+            text = stringResource(R.string.drawer_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -92,21 +92,4 @@ fun NkDrawerSheet(sections: List<NkDrawerSection>) {
         }
     }
     Spacer(Modifier.height(NkSpacing.xl))
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun NkNoteCard(
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, NkShapes.mediumLarge)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(NkSpacing.lg)
-    ) { content() }
 }

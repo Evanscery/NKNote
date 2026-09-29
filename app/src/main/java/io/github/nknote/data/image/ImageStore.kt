@@ -34,4 +34,11 @@ interface ImageStore {
 
     /** Whether the file at [path] exists on disk. */
     fun exists(path: String): Boolean
+
+    /**
+     * Move the file at [path] into `images/<noteId>/`, returning the new absolute path — or
+     * [path] unchanged when it already lives there, the file is missing, or the move fails.
+     * Used to re-home images picked before a new note's first save (provisional folder `0`).
+     */
+    fun relocateToNote(path: String, noteId: Int): String
 }

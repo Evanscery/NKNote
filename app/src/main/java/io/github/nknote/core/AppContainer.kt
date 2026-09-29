@@ -1,6 +1,7 @@
 package io.github.nknote.core
 
 import android.content.Context
+import io.github.nknote.data.backup.BackupManager
 import io.github.nknote.data.db.NkNoteDatabase
 import io.github.nknote.data.image.AndroidImageStore
 import io.github.nknote.data.image.ImageStore
@@ -47,6 +48,9 @@ class AppContainer(private val context: Context) {
     val noteRepository: NoteRepository by lazy {
         NoteRepositoryImpl(database.noteDao(), database.tagDao(), database.noteTagDao(), imageStore)
     }
+
+    /** Zip backup export/import (notes + tags + image files). */
+    val backupManager: BackupManager by lazy { BackupManager(context, noteRepository) }
 
     /**
      * Sync engine. Default is [NoopSyncEngine]; a future netdisk-API or LAN-sync implementation

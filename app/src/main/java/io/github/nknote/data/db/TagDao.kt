@@ -31,4 +31,8 @@ interface TagDao {
 
     @Query("DELETE FROM tags WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    /** Removes tags no longer assigned to any note. Tag lifecycle is automatic — no manage screen. */
+    @Query("DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tagId FROM note_tags)")
+    suspend fun deleteOrphans()
 }

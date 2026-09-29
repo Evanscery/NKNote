@@ -1,5 +1,6 @@
 package io.github.nknote.ui.trash
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,7 +49,7 @@ import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkSpacing
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TrashPage(
     nav: NkNoteNavigation,
@@ -54,7 +57,10 @@ fun TrashPage(
 ) {
     val notes by viewModel.deletedNotes.collectAsStateWithLifecycle()
     var showClear by remember { mutableStateOf(false) }
+    // Permanent deletion always confirms — it is irreversible (note row + image files).
+    var pendingDelete by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     NkNoteTheme {
         Scaffold(
@@ -85,9 +91,33 @@ fun TrashPage(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(notes, key = { it.id }) { note ->
-                        TrashRow(note = note, onRestore = { viewModel.restore(note.id) }, onDelete = { viewModel.deleteForever(note.id) })
+                        TrashRow(
+                            note = note,
+                            onRestore = { viewModel.restore(note.id) },
+                            onDelete = { pendingDelete = note.id },
+                            onLongPressDelete = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pendingDelete = note.id
+                            },
+                            modifier = Modifier.animateItemPlacement()
+                        )
                     }
                 }
+            }
+        }
+
+        pendingDelete?.let { target ->
+            NkDialog(
+                onDismiss = { pendingDelete = null },
+                title = stringResource(R.string.trash_delete_forever),
+                confirmText = stringResource(R.string.common_confirm),
+                onConfirm = {
+                    viewModel.deleteForever(target)
+                    pendingDelete = null
+                },
+                dismissText = stringResource(R.string.common_cancel)
+            ) {
+                Text(stringResource(R.string.trash_delete_confirm), style = MaterialTheme.typography.bodyMedium)
             }
         }
 
@@ -109,8 +139,14 @@ fun TrashPage(
 }
 
 @Composable
-private fun TrashRow(note: Note, onRestore: () -> Unit, onDelete: () -> Unit) {
-    NkNoteCard(onClick = onRestore, onLongClick = onDelete) {
+private fun TrashRow(
+    note: Note,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+    onLongPressDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NkNoteCard(onClick = onRestore, onLongClick = onLongPressDelete, modifier = modifier) {
         Column {
             Text(
                 text = note.title.ifBlank { stringResource(R.string.common_no_title) },

@@ -10,37 +10,40 @@ Designed to be calm, soft, and opinionated — *not* the default Material You lo
 
 ## Features
 
-- **Rich text diary** — native Compose editor with bold / italic / underline / strikethrough / color / font size, full heading hierarchy (Title / Heading / Subheading / Body), quotes, bullet & auto-incrementing numbered lists, and inline images. No WebView, no third-party editor.
-- **Editor power tools** — undo/redo command stack, sticky style, active-style indicator on the FormatBar, scroll-to-focused, word/char count, text alignment (Start/Center/End), list nesting/indent (0–3), code blocks, hyperlinks (rendered as `LinkAnnotation` in the viewer), and find-in-page.
-- **Editor companion** — autosave on `Lifecycle.Event.ON_STOP` + debounced save (3 s after the last edit), draft persistence via `SavedStateHandle` (per-paragraph `(text, selectionStart, selectionEnd)` tuple, safe across process death), and built-in templates (Gratitude / Daily Log / Free Write).
-- **Image attachments** — pick from the media picker, auto-compressed to WebP **quality 75, max dimension 1600 px** on disk (no external compressor library). Images are stored as files (`filesDir/images/<noteId>/<sha256>.webp`), not bloated in the database.
-- **Image viewer** — zoomable preview with vertical-swipe-to-dismiss, share via `FileProvider` (`ACTION_SEND`, no new permission), and an image-info overlay (dimensions + file size).
+- **Rich text diary** — native Compose editor with bold / italic / underline / strikethrough / color / font size, full heading hierarchy (Title / Heading / Subheading / Body), quotes, bullet & auto-incrementing numbered lists, checkbox task lists, and inline images. No WebView, no third-party editor.
+- **Editor power tools** — undo/redo command stack with burst coalescing (word-sized undo steps), sticky style that can also *un*-style forward typing, active-style indicator on the two-tier FormatBar, scroll-to-focused, word/char count, text alignment (Start/Center/End), list nesting/indent (0–3), code blocks, hyperlinks, and find-in-page with live match highlighting.
+- **Markdown shortcuts** — type `- `, `1. `, `# `/`## `/`### `, `> `, ``` ` ``` or `[] ` at a line start to convert the paragraph; Enter on an empty list item exits the list.
+- **Multi-paragraph paste** — pasted newlines split into paragraphs with span styles preserved, as a single undo step. Soft-keyboard backspace at a paragraph start merges paragraphs (zero-width-sentinel detection — works on every IME, not just hardware keyboards).
+- **Reader mode** — notes open in a read-only view first (tappable hyperlinks, checkable task items, images open the viewer); an edit button pushes the editor.
+- **Tags** — tag entries in the editor (chips + inline input), filter the home list by tag, colored deterministically from a curated palette. Orphan tags clean themselves up.
+- **Editor companion** — autosave on `Lifecycle.Event.ON_STOP` + debounced save (3 s after the last edit; pure cursor moves don't schedule saves), an empty-note guard (backing out of a pristine editor leaves no junk row), draft persistence via `SavedStateHandle` (safe across process death), and built-in templates (Gratitude / Daily Log / Free Write).
+- **Image attachments** — pick from the media picker, auto-compressed to WebP **quality 75, max dimension 1600 px** on disk (no external compressor library). Stored as files (`filesDir/images/<noteId>/<sha256>.webp`); images picked before a new note's first save are re-homed from the provisional folder once the row id exists.
+- **Image viewer** — zoomable preview with vertical-swipe-to-dismiss, share via `FileProvider`, delete with confirmation, and an image-info overlay (dimensions + file size).
 - **Weather & mood** — tag every entry with the weather and your mood.
-- **Trash** — soft-delete with restore / delete-forever / empty-trash. Image files are cleaned up *only* on permanent-delete or empty-trash (soft-delete keeps them so restore works).
-- **Search** — full-text search (Room **FTS4**) across titles, excerpts, and the plain-text rendition of content. Empty query is guarded (`MATCH ''` would throw).
-- **Calendar** — month grid of days with entries, tap a day to open its notes.
+- **Trash** — soft-delete with undo snackbar, restore / delete-forever (confirmed) / empty-trash. Image files are cleaned up *only* on permanent-delete or empty-trash.
+- **Search** — DB-side full-text search (Room **FTS4**) with a 300 ms debounce and operator-safe query sanitizing; composes with the tag filter.
+- **Calendar** — month grid with live day markers, localized weekday header, month-flip animation, jump-to-today, tap a day for its notes.
 - **Random picker** — a small, satisfying random-selection tool.
-- **Explore** — "on this day, other years": revisit past entries written on today's date.
-- **Import** — import `.txt` files; auto-parsed into notes (titles, headings, quotes, lists).
-- **Settings** — theme mode (System / Light / Dark, applied on cold start with no flash via `AppContainer.themeMode: MutableStateFlow<ThemeMode>`), and a JSON export of all notes.
-- **Tools** — drawer hub for Random + Import.
+- **Explore** — "on this day, other years", grouped by year with "N years ago" headers.
+- **Backup** — export a **.zip backup (notes + tags + image files)** with relative paths that survive reinstall; import restores images and remaps ids. `.txt` import and legacy `.json` import still work.
+- **Settings** — theme mode (System / Light / Dark three-way picker, applied on cold start with no flash), export with progress/error states, GitHub link, runtime version display.
 - **i18n** — English + Simplified Chinese, follows the system locale.
-- **Dark theme** — warm dark palette, edge-to-edge.
+- **Dark theme** — warm dark palette, edge-to-edge. Navigation uses a gentle fade-through transition; destructive actions get haptic feedback.
 
 ## Screens
 
 | Screen | Purpose |
 |---|---|
-| Home | Note list, FTS search, drawer entry points |
-| Editor | Rich text editing, meta (date / weather / mood / summary), image insertion, FormatBar + Find-in-page, templates |
-| Viewer | Zoomable image preview, swipe-to-dismiss, share, info overlay |
-| Trash | Restore / delete forever / empty (NkDialog) |
+| Home | Note list, FTS search + tag filter chips, undo snackbar, drawer entry points |
+| Reader | Read-only note view: tappable links, checkable tasks, tags, edit button |
+| Editor | Rich text editing, meta (date / weather / mood / summary / tags), image insertion, two-tier FormatBar, find-in-page, templates |
+| Viewer | Zoomable image preview, swipe-to-dismiss, share, delete (confirmed), info overlay |
+| Trash | Restore / delete forever (confirmed) / empty (NkDialog) |
 | Random | Random option picker |
-| Explore | "On this day" across years + note count |
-| Calendar | Month grid of days with notes |
-| Import | Import `.txt` into notes |
-| Tools | Hub for Random + Import |
-| Settings | Theme mode toggle + JSON export |
+| Explore | "On this day" grouped by year + note count |
+| Calendar | Month grid with live markers, jump-to-today, day notes |
+| Import | Import `.txt` / `.zip` backup / legacy `.json` |
+| Settings | Theme mode (3-way) + zip backup export |
 
 Every primary screen reaches the **global drawer** (a `ModalNavigationDrawer` hoisted in `NkNoteApp`, `gesturesEnabled = false` so it doesn't steal inner horizontal drags). The drawer is grouped into three sections:
 
@@ -48,7 +51,7 @@ Every primary screen reaches the **global drawer** (a `ModalNavigationDrawer` ho
 - **Tools** → Random · Import
 - **System** → Trash · Settings
 
-Editor and Viewer keep a back arrow (they are reached by direct navigation, not from the drawer).
+Reader, Editor and Viewer keep a back arrow (they are reached by direct navigation, not from the drawer).
 
 ## Architecture
 
@@ -56,25 +59,28 @@ NKNote follows **MVVM** with a thin manual dependency container (no Hilt/Koin, t
 
 ```
 ui/                # Compose screens + ViewModels (MVVM view layer)
-  theme/           # curated design system: Color / Type / Shape
+  theme/           # curated design system: Color / Type / Shape / Motion
                    #   + NkSpacing / NkIconSize (4-based tokens)
                    #   + ThemeMode wiring (LocalDarkTheme, LocalDrawerState)
   components/      # NkTopAppBar / NkSettingsRow / NkEmptyState / NkList /
-                   #   NkDrawer / NkDialog / NkNoteCard / pickers /
+                   #   NkDrawer / NkDialog / NkChoiceDialog / NkNoteCard /
+                   #   NkSnackbar (app-scoped host) / pickers /
                    #   WeatherIconMap / MoodIconMap (icon maps kept OUT of model/)
-  navigation/      # NavHost + Destination + NkNoteNavigation + LocalDrawerState
-  home/ editor/ viewer/ trash/ random/ explore/
-  calendar/ import_/ tools/ settings/
+  navigation/      # NavHost (+ fade-through transitions) + Destination +
+                   #   NkNoteNavigation + LocalDrawerState
+  home/ reader/ editor/ viewer/ trash/ random/ explore/
+  calendar/ import_/ settings/
 data/
-  db/              # Room database + DAOs + Converters + MIGRATIONS seam
-  entity/          # Note · Tag · NoteTag · NoteFts (@Fts4 contentEntity = Note)
+  db/              # Room database + DAOs + FtsQuery sanitizer + Converters + MIGRATIONS seam
+  entity/          # Note · Tag (normalized-name identity) · NoteTag · NoteFts
   repository/      # NoteRepository (interface) + NoteRepositoryImpl
-  image/           # ImageStore (interface) + AndroidImageStore (actual)
+  image/           # ImageStore (interface, incl. relocateToNote) + AndroidImageStore
   importer/        # TextImporter — txt → Note
+  backup/          # BackupManager — zip export/import (notes + tags + images)
   sync/            # SyncEngine abstraction (serverless; default Noop)
   templates/       # NoteTemplates — built-in starter documents
-model/             # RichDocument (portable rich-text schema), Weather, Mood,
-                   #   NkPalette (named default tag color) — pure Kotlin, no Compose deps
+model/             # RichDocument v3 (portable rich-text schema incl. CHECKBOX),
+                   #   Weather, Mood, NkPalette (curated tag palette) — pure Kotlin
 core/              # AppContainer (manual DI) + ThemeMode + themeMode StateFlow
 ```
 
@@ -83,7 +89,7 @@ Key shape:
 - **Model portability** — `model/` is pure Kotlin (no `androidx.compose.*` imports). `Weather`/`Mood` carry only a `key`; the icon+label maps live in `ui/components/`. `RichDocument` is `@Serializable` with defaults on every field (backward-compatible).
 - **`ImageStore` interface** — `ImageStore` is an interface; `AndroidImageStore` is the Android `actual`. Other platforms plug in their own without touching the repo or UI.
 - **MVVM StateFlow** — observable UI state lives in `StateFlow` (e.g. `EditorUiState`, `HomeUiState`). The editor's real-time `TextFieldValue` buffer intentionally stays in `mutableStateOf` / `mutableStateListOf` for keystroke latency; the seam is documented in `EditorViewModel`.
-- **FTS4 search** — `NoteFts` is `@Fts4(contentEntity = Note::class)` over `searchText` / `title` / `excerpt`; Room auto-generates the sync triggers. `NoteDao.search` joins `notes` ↔ `note_fts` on `rowid` and guards empty queries.
+- **FTS4 search** — `NoteFts` is `@Fts4(contentEntity = Note::class)` over `searchText` / `title` / `excerpt`; Room auto-generates the sync triggers. `NoteDao.search` joins `notes` ↔ `note_fts` on `rowid` and guards empty queries. Home search goes DB-side through `FtsQuery.sanitize` (quoted prefix tokens, operators neutralized). Known limitation: the FTS4 `simple` tokenizer doesn't segment CJK, so Chinese matches as a prefix from token start.
 - **Design tokens** — every radius comes from `NkShapes`, every spacing dp from `NkSpacing`, every icon size from `NkIconSize`. No `RoundedCornerShape(<n>.dp)` outside `ui/theme/Shape.kt`.
 
 See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full design, **[docs/tech-stack.md](docs/tech-stack.md)** for the interview-grade dependency walkthrough, **[docs/sync-serverless.md](docs/sync-serverless.md)** for the sync seam, and **[docs/multiplatform.md](docs/multiplatform.md)** for the web/PC expansion plan.

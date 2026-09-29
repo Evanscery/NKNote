@@ -23,7 +23,8 @@ data class EditorParagraph(
     val spans: List<RichSpan> = emptyList(),   // partition; spans[i].text concatenates to [text]
     val image: InlineImage? = null,
     val alignment: ParagraphAlignment = ParagraphAlignment.START,
-    val indentLevel: Int = 0   // 0..3; mirrored from RichParagraph for renderer consumption
+    val indentLevel: Int = 0,  // 0..3; mirrored from RichParagraph for renderer consumption
+    val checked: Boolean = false   // CHECKBOX task-item state; mirrored from RichParagraph
 )
 
 /** Build the display AnnotatedString's character coverage from spans. Returns one style per char. */
@@ -44,16 +45,16 @@ private fun EditorParagraph.perCharStyles(): List<RichSpan> {
 }
 
 /**
- * The [RichSpan] covering character position [position] (collapsed selection). For a cursor at
- * end-of-text (`position == text.length`), returns the last char's span. Returns null for an
- * empty paragraph. Used by [io.github.nknote.ui.editor.EditorViewModel] to compute the active
- * style at the cursor (the `styleAtCursor` field of [io.github.nknote.ui.editor.EditorUiState]).
+ * The [RichSpan] covering the character BEFORE the caret at [position] (standard editor
+ * semantics — the style that would apply to the next typed character). At position 0 the
+ * first character's span is returned. Returns null for an empty paragraph. Used by
+ * [io.github.nknote.ui.editor.EditorViewModel] to compute the active style at the cursor
+ * (the `styleAtCursor` field of [io.github.nknote.ui.editor.EditorUiState]).
  */
 fun EditorParagraph.spanAt(position: Int): RichSpan? {
     if (text.isEmpty()) return null
     val p = position.coerceIn(0, text.length)
-    val charIdx = if (p == text.length) p - 1 else p
-    if (charIdx < 0) return null
+    val charIdx = if (p == 0) 0 else p - 1
     return perCharStyles().getOrNull(charIdx)
 }
 
@@ -124,7 +125,11 @@ fun EditorParagraph.afterTextChange(newText: String): EditorParagraph {
     return copy(text = newText, spans = repartition(newChars))
 }
 
-/** Split a paragraph at [cursor] into (before, after). Used on Enter. */
+/**
+ * Split a paragraph at [cursor] into (before, after). Used on Enter. Heading styles do not
+ * continue onto the next line (TITLE/HEADING/SUBHEADING → BODY); list styles (BULLET /
+ * NUMBERED / CHECKBOX) DO continue, with a CHECKBOX continuation starting unchecked.
+ */
 fun EditorParagraph.splitAt(cursor: Int): Pair<EditorParagraph, EditorParagraph> {
     val c = cursor.coerceIn(0, text.length)
     val beforeText = text.substring(0, c)
@@ -134,7 +139,41 @@ fun EditorParagraph.splitAt(cursor: Int): Pair<EditorParagraph, EditorParagraph>
     val after = repartition(chars.subList(c, text.length))
     val afterStyle = when (style) { ParagraphStyle.TITLE, ParagraphStyle.HEADING, ParagraphStyle.SUBHEADING -> ParagraphStyle.BODY; else -> style }
     return copy(text = beforeText, spans = before) to
-        copy(text = afterText, spans = after, style = afterStyle)
+        copy(text = afterText, spans = after, style = afterStyle, checked = false)
+}
+
+/**
+ * Split this paragraph's text on `'\n'` (dropping the newline chars) into one paragraph per
+ * line, preserving span styles across the split points. Always returns at least one
+ * paragraph. Line 0 keeps this paragraph's full identity; later lines follow [splitAt]'s
+ * continuation rule (headings downgrade to BODY, lists continue, CHECKBOX unchecked).
+ *
+ * This is the multi-paragraph-paste primitive: the caller first absorbs the pasted text
+ * (newlines included) via [afterTextChange], then splits the combined paragraph here.
+ */
+fun EditorParagraph.splitIntoLines(): List<EditorParagraph> {
+    if ('\n' !in text) return listOf(this)
+    val chars = perCharStyles()
+    val continuationStyle = when (style) {
+        ParagraphStyle.TITLE, ParagraphStyle.HEADING, ParagraphStyle.SUBHEADING -> ParagraphStyle.BODY
+        else -> style
+    }
+    val out = ArrayList<EditorParagraph>()
+    var lineStart = 0
+    var i = 0
+    while (i <= text.length) {
+        if (i == text.length || text[i] == '\n') {
+            val lineChars = chars.subList(lineStart, i)
+            val lineText = text.substring(lineStart, i)
+            out.add(
+                if (out.isEmpty()) copy(text = lineText, spans = repartition(lineChars))
+                else copy(text = lineText, spans = repartition(lineChars), style = continuationStyle, checked = false)
+            )
+            lineStart = i + 1
+        }
+        i++
+    }
+    return out
 }
 
 /** Merge [other] (next paragraph) into the end of this paragraph. Used on backspace at start. */
@@ -154,7 +193,8 @@ fun EditorDocument.toModel(): RichDocument =
             style = p.style,
             image = p.image,
             alignment = p.alignment,
-            indentLevel = p.indentLevel
+            indentLevel = p.indentLevel,
+            checked = p.checked
         )
     })
 
@@ -173,7 +213,8 @@ fun RichDocument.toEditor(): EditorDocument =
             spans = p.spans,
             image = p.image,
             alignment = p.alignment,
-            indentLevel = p.indentLevel
+            indentLevel = p.indentLevel,
+            checked = p.checked
         )
     })
 

@@ -1,5 +1,10 @@
 package io.github.nknote.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -9,10 +14,15 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -30,18 +40,21 @@ import io.github.nknote.NkNoteApplication
 import io.github.nknote.R
 import io.github.nknote.core.ThemeMode
 import io.github.nknote.ui.calendar.CalendarPage
+import io.github.nknote.ui.components.LocalSnackbarHostState
 import io.github.nknote.ui.components.NkDrawerItem
 import io.github.nknote.ui.components.NkDrawerSection
 import io.github.nknote.ui.components.NkDrawerSheet
+import io.github.nknote.ui.components.NkSnackbarHost
 import io.github.nknote.ui.editor.EditorPage
 import io.github.nknote.ui.explore.ExplorePage
 import io.github.nknote.ui.home.HomePage
 import io.github.nknote.ui.import_.ImportPage
 import io.github.nknote.ui.random.RandomPage
+import io.github.nknote.ui.reader.NoteReadPage
 import io.github.nknote.ui.settings.SettingsPage
 import io.github.nknote.ui.theme.LocalDarkTheme
+import io.github.nknote.ui.theme.NkMotion
 import io.github.nknote.ui.theme.NkNoteTheme
-import io.github.nknote.ui.tools.ToolsPage
 import io.github.nknote.ui.trash.TrashPage
 import io.github.nknote.ui.viewer.ImageViewerPage
 import kotlinx.coroutines.launch
@@ -69,6 +82,7 @@ fun NkNoteApp() {
         NkNoteNavigation(
             back = { navController.popBackStack() },
             toEditor = { id -> navController.navigate("editor/${id ?: Destination.Editor.ARG_NOTE_ID_DEFAULT}") },
+            toReader = { id -> navController.navigate("reader/$id") },
             toViewer = { path ->
                 val encoded = URLEncoder.encode(path, "UTF-8")
                 navController.navigate("viewer/$encoded")
@@ -76,7 +90,6 @@ fun NkNoteApp() {
             toTrash = { navController.navigate(Destination.Trash.route) },
             toExplore = { navController.navigate(Destination.Explore.route) },
             toCalendar = { navController.navigate(Destination.Calendar.route) },
-            toTools = { navController.navigate(Destination.Tools.route) },
             toRandom = { navController.navigate(Destination.Random.route) },
             toSettings = { navController.navigate(Destination.Settings.route) },
             toImport = { navController.navigate(Destination.Import.route) },
@@ -90,6 +103,9 @@ fun NkNoteApp() {
     }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    // App-scoped snackbar host: a snackbar (and its undo action) survives navigating away
+    // from the screen that showed it.
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val closeDrawer: () -> Unit = { scope.launch { drawerState.close() } }
 
@@ -131,7 +147,8 @@ fun NkNoteApp() {
 
     CompositionLocalProvider(
         LocalDarkTheme provides darkTheme,
-        LocalDrawerState provides drawerState
+        LocalDrawerState provides drawerState,
+        LocalSnackbarHostState provides snackbarHostState
     ) {
         NkNoteTheme(darkTheme = darkTheme) {
             // gesturesEnabled = false: the swipe-open gesture would otherwise intercept horizontal
@@ -146,9 +163,32 @@ fun NkNoteApp() {
                     }
                 }
             ) {
-                NavHost(navController = navController, startDestination = Destination.Home.route) {
+                Box {
+                // Fade-through with a subtle directional slide (1/16 width) — replaces
+                // navigation-compose's default 700 ms cross-fade with the app's motion language.
+                NavHost(
+                    navController = navController,
+                    startDestination = Destination.Home.route,
+                    enterTransition = {
+                        fadeIn(tween(NkMotion.DurationMedium, easing = NkMotion.StandardEasing)) +
+                            slideInHorizontally(tween(NkMotion.DurationMedium, easing = NkMotion.StandardEasing)) { it / 16 }
+                    },
+                    exitTransition = { fadeOut(tween(NkMotion.DurationShort)) },
+                    popEnterTransition = { fadeIn(tween(NkMotion.DurationMedium, easing = NkMotion.StandardEasing)) },
+                    popExitTransition = {
+                        fadeOut(tween(NkMotion.DurationShort)) +
+                            slideOutHorizontally(tween(NkMotion.DurationMedium, easing = NkMotion.StandardEasing)) { it / 16 }
+                    }
+                ) {
                     composable(Destination.Home.route) {
-                        HomePage(nav = nav, openNote = { id -> nav.toEditor(id) })
+                        HomePage(nav = nav, openNote = { id -> nav.toReader(id) })
+                    }
+                    composable(
+                        route = Destination.Reader.routeWithArg,
+                        arguments = listOf(navArgument(Destination.Reader.ARG_NOTE_ID) { type = NavType.IntType })
+                    ) { backStack ->
+                        val noteId = backStack.arguments?.getInt(Destination.Reader.ARG_NOTE_ID) ?: return@composable
+                        NoteReadPage(noteId = noteId, nav = nav)
                     }
                     composable(
                         route = Destination.Editor.routeWithArg,
@@ -168,12 +208,16 @@ fun NkNoteApp() {
                         ImageViewerPage(imagePath = path, nav = nav)
                     }
                     composable(Destination.Trash.route) { TrashPage(nav = nav) }
-                    composable(Destination.Explore.route) { ExplorePage(nav = nav, openNote = { nav.toEditor(it) }) }
-                    composable(Destination.Calendar.route) { CalendarPage(nav = nav, openNote = { nav.toEditor(it) }) }
-                    composable(Destination.Tools.route) { ToolsPage(nav = nav) }
+                    composable(Destination.Explore.route) { ExplorePage(nav = nav, openNote = { nav.toReader(it) }) }
+                    composable(Destination.Calendar.route) { CalendarPage(nav = nav, openNote = { nav.toReader(it) }) }
                     composable(Destination.Random.route) { RandomPage(nav = nav) }
                     composable(Destination.Settings.route) { SettingsPage(nav = nav) }
                     composable(Destination.Import.route) { ImportPage(nav = nav) }
+                }
+                NkSnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                )
                 }
             }
         }

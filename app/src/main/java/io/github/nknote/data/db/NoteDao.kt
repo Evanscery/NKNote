@@ -55,6 +55,10 @@ abstract class NoteDao {
     @Query("SELECT DISTINCT date FROM notes WHERE isDeleted = 0")
     abstract suspend fun allDates(): List<String>
 
+    /** Live variant of [allDates] — the calendar's day markers stay fresh. */
+    @Query("SELECT DISTINCT date FROM notes WHERE isDeleted = 0")
+    abstract fun observeAllDates(): Flow<List<String>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insert(note: Note): Long
 

@@ -4,31 +4,46 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.nknote.data.entity.Note
 import io.github.nknote.data.repository.NoteRepository
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class ExploreViewModel(private val repo: NoteRepository) : ViewModel() {
 
-    private val _todayThisDay = MutableStateFlow<List<Note>>(emptyList())
-    val todayThisDay: StateFlow<List<Note>> = _todayThisDay.asStateFlow()
+    /** "On this day" grouped by year (newest year first), today's own entries excluded. */
+    data class YearSection(val yearsAgo: Int, val year: Int, val notes: List<Note>)
 
     val totalNotes: StateFlow<Int> =
         repo.observeAllNotes().map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    init {
-        viewModelScope.launch {
-            val md = monthDay()
-            repo.observeNotesOnMonthDay(md).collect { _todayThisDay.value = it.filter { n -> n.date != today() } }
-        }
-    }
+    val sections: StateFlow<List<YearSection>> =
+        repo.observeNotesOnMonthDay(monthDay())
+            .map { groupByYear(it, LocalDate.now()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private fun monthDay(): String = LocalDate.now().let { "%02d-%02d".format(it.monthValue, it.dayOfMonth) }
-    private fun today(): String = LocalDate.now().toString()
+    companion object {
+        /**
+         * Pure + unit-testable: excludes today's date, groups by note year, newest year first,
+         * notes within a year newest-edit first.
+         */
+        fun groupByYear(notes: List<Note>, today: LocalDate): List<YearSection> =
+            notes.asSequence()
+                .filter { it.date != today.toString() && it.date.length >= 4 }
+                .groupBy { it.date.take(4).toIntOrNull() ?: 0 }
+                .filterKeys { it > 0 }
+                .map { (year, ns) ->
+                    YearSection(
+                        yearsAgo = today.year - year,
+                        year = year,
+                        notes = ns.sortedByDescending { it.updatedAt }
+                    )
+                }
+                .sortedByDescending { it.year }
+    }
 }
+
+private fun monthDay(): String =
+    LocalDate.now().let { "%02d-%02d".format(it.monthValue, it.dayOfMonth) }

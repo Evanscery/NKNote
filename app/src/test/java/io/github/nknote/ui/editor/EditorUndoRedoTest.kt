@@ -96,7 +96,7 @@ class EditorUndoRedoTest {
         val vm = EditorViewModel(null, imageStore, repo, SavedStateHandle())
 
         // Empty paragraph, cursor at 0 → empty selection → toggleBold sets the sticky flag.
-        assertEquals(0, vm.fields[0].selection.start)
+        assertEquals(0, vm.fields[0].rawSelection.start)
         vm.toggleBold()
 
         // Type "x" — the inserted run should pick up the sticky bold style.
@@ -214,5 +214,6 @@ class EditorUndoRedoTest {
         override fun delete(path: String) {}
         override fun deleteAllForNote(noteId: Int) {}
         override fun exists(path: String): Boolean = false
+        override fun relocateToNote(path: String, noteId: Int): String = path
     }
 }

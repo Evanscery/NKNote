@@ -1,5 +1,11 @@
 package io.github.nknote.ui.calendar
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -22,19 +30,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,13 +51,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
+import io.github.nknote.ui.components.NkEmptyState
+import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.NkTopAppBar
-import io.github.nknote.ui.home.HomeViewModel
 import io.github.nknote.ui.navigation.LocalDrawerState
 import io.github.nknote.ui.navigation.NkNoteNavigation
+import io.github.nknote.ui.theme.NkMotion
 import io.github.nknote.ui.theme.NkNoteTheme
-import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -60,13 +71,12 @@ import java.util.Locale
 fun CalendarPage(
     nav: NkNoteNavigation,
     openNote: (Int) -> Unit,
-    viewModel: HomeViewModel = viewModel(factory = AppViewModelFactory.factory)
+    viewModel: CalendarViewModel = viewModel(factory = AppViewModelFactory.factory)
 ) {
-    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    var noteDates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-
-    LaunchedEffect(Unit) { noteDates = viewModel.allDates().toSet() }
+    val currentMonth by viewModel.currentMonth.collectAsStateWithLifecycle()
+    val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
+    val noteDates by viewModel.noteDates.collectAsStateWithLifecycle()
+    val notesForDate by viewModel.notesForSelectedDate.collectAsStateWithLifecycle()
 
     NkNoteTheme {
         Scaffold(
@@ -79,35 +89,48 @@ fun CalendarPage(
             }
         ) { padding ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = NkSpacing.lg),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    // The month grid + a multi-note day list can exceed one screen — scroll.
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = NkSpacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Month nav
+                val today = LocalDate.now()
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth().padding(vertical = NkSpacing.md)
                 ) {
-                    IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                    IconButton(onClick = { viewModel.previousMonth() }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(
-                        text = currentMonth.format(DateTimeFormatter.ofPattern("yyyy / M", Locale.getDefault())),
+                        text = currentMonth.format(
+                            DateTimeFormatter.ofPattern(stringResource(R.string.calendar_month_format), Locale.getDefault())
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                    IconButton(onClick = { viewModel.nextMonth() }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                if (currentMonth != YearMonth.now() || selectedDate != today) {
+                    TextButton(onClick = { viewModel.goToToday() }) {
+                        Text(stringResource(R.string.home_today), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
 
-                // Day-of-week header (Mon–Sun)
+                // Day-of-week header, localized (Monday-first).
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    val dowLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-                    dowLabels.forEach { label ->
+                    val locale = Locale.getDefault()
+                    DayOfWeek.entries.forEach { dow ->
                         Text(
-                            text = label,
+                            text = dow.getDisplayName(TextStyle.NARROW, locale),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -117,63 +140,100 @@ fun CalendarPage(
                 }
                 Spacer(Modifier.height(NkSpacing.sm))
 
-                // Calendar grid
-                val firstDay = currentMonth.atDay(1)
-                val daysInMonth = currentMonth.lengthOfMonth()
-                val startOffset = firstDay.dayOfWeek.value - 1 // Monday = 0
-
-                var dayCounter = 1 - startOffset
-                while (dayCounter <= daysInMonth) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        for (col in 0 until 7) {
-                            val dayNum = dayCounter + col
-                            if (dayNum in 1..daysInMonth) {
-                                val date = currentMonth.atDay(dayNum)
-                                val dateStr = date.toString()
-                                val hasNote = dateStr in noteDates
-                                val isSelected = date == selectedDate
-                                CalendarDayCell(
-                                    day = dayNum,
-                                    hasNote = hasNote,
-                                    isSelected = isSelected,
-                                    isToday = date == LocalDate.now(),
-                                    onClick = { selectedDate = if (isSelected) null else date },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } else {
-                                Box(modifier = Modifier.weight(1f).aspectRatio(1f))
-                            }
-                        }
-                    }
-                    dayCounter += 7
+                // Calendar grid: subtle slide+fade on month change, direction-aware.
+                AnimatedContent(
+                    targetState = currentMonth,
+                    transitionSpec = {
+                        val forward = targetState > initialState
+                        (slideInHorizontally(tween(NkMotion.DurationMedium, easing = NkMotion.StandardEasing)) {
+                            if (forward) it / 3 else -it / 3
+                        } + fadeIn(tween(NkMotion.DurationMedium))) togetherWith
+                            fadeOut(tween(NkMotion.DurationShort))
+                    },
+                    label = "month_grid"
+                ) { month ->
+                    MonthGrid(
+                        month = month,
+                        noteDates = noteDates,
+                        selectedDate = selectedDate,
+                        today = today,
+                        onSelect = { viewModel.selectDate(it) }
+                    )
                 }
 
                 // Selected date notes
-                selectedDate?.let { date ->
-                    val dateStr = date.toString()
-                    LaunchedEffect(dateStr) { viewModel.loadNotesForDate(dateStr) }
-                    val notesForDate by viewModel.notesForDate.collectAsStateWithLifecycle()
+                selectedDate?.let {
                     Spacer(Modifier.height(NkSpacing.lg))
                     if (notesForDate.isEmpty()) {
-                        Text(stringResource(R.string.calendar_no_notes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        NkEmptyState(
+                            message = stringResource(R.string.calendar_no_notes),
+                            fillMaxSize = false
+                        )
                     } else {
-                        Text(stringResource(R.string.calendar_notes_count, notesForDate.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = NkSpacing.sm))
+                        Text(
+                            stringResource(R.string.calendar_notes_count, notesForDate.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = NkSpacing.sm)
+                        )
                         notesForDate.forEach { note ->
-                            Surface(
+                            NkNoteCard(
                                 onClick = { openNote(note.id) },
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = NkShapes.mediumSmall,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                                modifier = Modifier.padding(vertical = NkSpacing.xs / 2)
                             ) {
-                                Column(modifier = Modifier.padding(NkSpacing.md)) {
-                                    Text(note.title.ifBlank { stringResource(R.string.common_no_title) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Column {
+                                    Text(
+                                        note.title.ifBlank { stringResource(R.string.common_no_title) },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                     Text(note.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
                 }
+                Spacer(Modifier.height(NkSpacing.xl))
             }
+        }
+    }
+}
+
+@Composable
+private fun MonthGrid(
+    month: YearMonth,
+    noteDates: Set<String>,
+    selectedDate: LocalDate?,
+    today: LocalDate,
+    onSelect: (LocalDate) -> Unit
+) {
+    Column {
+        val firstDay = month.atDay(1)
+        val daysInMonth = month.lengthOfMonth()
+        val startOffset = firstDay.dayOfWeek.value - 1 // Monday = 0
+
+        var dayCounter = 1 - startOffset
+        while (dayCounter <= daysInMonth) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                for (col in 0 until 7) {
+                    val dayNum = dayCounter + col
+                    if (dayNum in 1..daysInMonth) {
+                        val date = month.atDay(dayNum)
+                        val dateStr = date.toString()
+                        CalendarDayCell(
+                            day = dayNum,
+                            hasNote = dateStr in noteDates,
+                            isSelected = date == selectedDate,
+                            isToday = date == today,
+                            onClick = { onSelect(date) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                    }
+                }
+            }
+            dayCounter += 7
         }
     }
 }
@@ -197,21 +257,46 @@ private fun CalendarDayCell(
         isToday -> MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
+    val todayLabel = stringResource(R.string.home_today)
+    val hasNoteLabel = stringResource(R.string.a11y_calendar_has_note)
     Box(
-        modifier = modifier.aspectRatio(1f).clip(CircleShape).background(bgColor).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = day.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = textColor,
-                fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                textAlign = TextAlign.Center
-            )
-            if (hasNote && !isSelected) {
-                Box(modifier = Modifier.size(5.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(CircleShape)
+            .background(bgColor)
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                selected = isSelected
+                val states = buildList {
+                    if (isToday) add(todayLabel)
+                    if (hasNote) add(hasNoteLabel)
+                }
+                if (states.isNotEmpty()) stateDescription = states.joinToString(", ")
             }
+    ) {
+        // Fixed layout: the number is centered; the dot is anchored to the bottom so the number
+        // never shifts, and the dot stays visible on the selected day (inverted color).
+        Text(
+            text = day.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.align(Alignment.Center)
+        )
+        if (hasNote) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp)
+                    .size(5.dp)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.primary,
+                        CircleShape
+                    )
+            )
         }
     }
 }

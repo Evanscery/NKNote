@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -30,12 +33,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.nknote.R
 import io.github.nknote.ui.editor.richtext.parseHexColor
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
+import io.github.nknote.ui.theme.SliderBlueAccent
+import io.github.nknote.ui.theme.SliderGreenAccent
+import io.github.nknote.ui.theme.SliderRedAccent
 import kotlin.math.roundToInt
 
 private val PALETTE = listOf(
@@ -43,40 +53,67 @@ private val PALETTE = listOf(
     "#A85A5A", "#8A8E5A", "#5A8E7A", "#5A5A8E", "#8E5A8E"
 )
 
+/**
+ * @param initial the color currently applied at the cursor (`#AARRGGBB`/`#RRGGBB`), used to
+ * mark the matching swatch with a selected ring and to seed the RGB sliders.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    var customHex by remember { mutableStateOf("#5E7A6E") }
-    var red by remember { mutableFloatStateOf(0.37f) }
-    var green by remember { mutableFloatStateOf(0.48f) }
-    var blue by remember { mutableFloatStateOf(0.43f) }
-    val rgb = Color(red, green, blue)
-    customHex = toHex(rgb)
+fun ColorPickerDialog(
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+    initial: String? = null
+) {
+    val initialColor = initial?.let { parseHexColor(it) }
+    var red by remember { mutableFloatStateOf(initialColor?.red ?: 0.37f) }
+    var green by remember { mutableFloatStateOf(initialColor?.green ?: 0.48f) }
+    var blue by remember { mutableFloatStateOf(initialColor?.blue ?: 0.43f) }
+    // The hex field is user-editable; slider edits overwrite it, typed edits win until the
+    // next slider move. Confirm applies whatever the field holds (falling back to sliders
+    // when it doesn't parse).
+    var customHex by remember { mutableStateOf(initial ?: toHex(Color(0.37f, 0.48f, 0.43f))) }
+    val sliderColor = Color(red, green, blue)
 
     NkDialog(
         onDismiss = onDismiss,
         title = stringResource(R.string.editor_select_color),
         confirmText = stringResource(R.string.common_confirm),
-        onConfirm = { onPick(customHex) },
+        onConfirm = { onPick(if (parseHexColor(customHex) != null) customHex else toHex(sliderColor)) },
         dismissText = stringResource(R.string.common_cancel)
     ) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(horizontalArrangement = Arrangement.spacedBy(NkSpacing.sm)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(NkSpacing.xs),
+                verticalArrangement = Arrangement.spacedBy(NkSpacing.xs)
+            ) {
                 PALETTE.forEach { hex ->
                     val c = parseHexColor(hex) ?: Color.Black
+                    val selected = initial != null && parseHexColor(initial) == c
                     Box(
-                        Modifier.size(34.dp)
+                        Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(40.dp)
                             .background(c, CircleShape)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline,
+                                shape = CircleShape
+                            )
                             .clickable { onPick(hex) }
+                            .semantics {
+                                contentDescription = hex
+                                role = Role.Button
+                            }
                     )
                 }
             }
             Spacer(Modifier.height(NkSpacing.lg))
-            Box(Modifier.size(56.dp).background(rgb, NkShapes.small))
+            Box(Modifier.size(56.dp).background(parseHexColor(customHex) ?: sliderColor, NkShapes.small))
             Spacer(Modifier.height(NkSpacing.sm))
-            SliderRow(red, Color(0xFFB0524A)) { red = it }
-            SliderRow(green, Color(0xFF6B8E5A)) { green = it }
-            SliderRow(blue, Color(0xFF5A6B8E)) { blue = it }
+            SliderRow(red, SliderRedAccent) { red = it; customHex = toHex(Color(it, green, blue)) }
+            SliderRow(green, SliderGreenAccent) { green = it; customHex = toHex(Color(red, it, blue)) }
+            SliderRow(blue, SliderBlueAccent) { blue = it; customHex = toHex(Color(red, green, it)) }
             Spacer(Modifier.height(NkSpacing.xs))
             OutlinedTextField(
                 value = customHex,

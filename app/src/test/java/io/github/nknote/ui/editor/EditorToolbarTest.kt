@@ -209,5 +209,6 @@ class EditorToolbarTest {
         override fun delete(path: String) {}
         override fun deleteAllForNote(noteId: Int) {}
         override fun exists(path: String): Boolean = false
+        override fun relocateToNote(path: String, noteId: Int): String = path
     }
 }

@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="homepage_sidebar_stastics_chs" translatable="false">统计</string>
-    <string name="homepage_sidebar_update_chs" translatable="false">同步</string>
-    <string name="homepage_sidebar_recyclebin_chs" translatable="false">回收站</string>
-</resources>

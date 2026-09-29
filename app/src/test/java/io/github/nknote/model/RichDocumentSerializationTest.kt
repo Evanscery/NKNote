@@ -82,6 +82,41 @@ class RichDocumentSerializationTest {
     }
 
     @Test
+    fun v3Checkbox_roundTrips() {
+        val doc = RichDocument(
+            paragraphs = listOf(
+                RichParagraph(
+                    spans = listOf(RichSpan("buy milk")),
+                    style = ParagraphStyle.CHECKBOX,
+                    checked = true
+                ),
+                RichParagraph(
+                    spans = listOf(RichSpan("walk dog")),
+                    style = ParagraphStyle.CHECKBOX
+                )
+            )
+        )
+        val s = json.encodeToString(RichDocument.serializer(), doc)
+        val back = json.decodeFromString(RichDocument.serializer(), s)
+        assertEquals(doc, back)
+        assertTrue(back.paragraphs[0].checked)
+        assertEquals(false, back.paragraphs[1].checked)
+    }
+
+    @Test
+    fun legacyJsonWithoutChecked_decodesToFalse() {
+        val legacy = """
+            {
+              "paragraphs": [
+                {"spans":[{"text":"old"}],"style":"BULLET"}
+              ]
+            }
+        """.trimIndent()
+        val doc = json.decodeFromString(RichDocument.serializer(), legacy)
+        assertEquals(false, doc.paragraphs[0].checked)
+    }
+
+    @Test
     fun roundTripIsDeterministicAcrossRepeatedRuns() {
         val doc = RichDocument(
             paragraphs = listOf(

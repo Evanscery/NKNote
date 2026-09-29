@@ -4,11 +4,11 @@ package io.github.nknote.ui.navigation
 class NkNoteNavigation(
     val back: () -> Unit,
     val toEditor: (Int?) -> Unit,
+    val toReader: (Int) -> Unit,
     val toViewer: (String) -> Unit,
     val toTrash: () -> Unit,
     val toExplore: () -> Unit,
     val toCalendar: () -> Unit,
-    val toTools: () -> Unit,
     val toRandom: () -> Unit,
     val toSettings: () -> Unit,
     val toImport: () -> Unit,

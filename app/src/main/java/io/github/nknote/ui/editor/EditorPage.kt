@@ -52,12 +52,16 @@ import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Title
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -85,6 +89,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -98,7 +103,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -128,6 +133,7 @@ import io.github.nknote.ui.editor.richtext.SpanVisualTransformation
 import io.github.nknote.ui.editor.richtext.HighlightRange
 import io.github.nknote.ui.editor.richtext.numberedCounters
 import io.github.nknote.ui.navigation.NkNoteNavigation
+import io.github.nknote.ui.theme.NkIconSize
 import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
@@ -152,6 +158,9 @@ fun EditorPage(
     var showColor by remember { mutableStateOf(false) }
     var showFontSize by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
+    var showLink by remember { mutableStateOf(false) }
+    var findActive by remember { mutableStateOf(false) }
+    var findQuery by remember { mutableStateOf("") }
     var overflowExpanded by remember { mutableStateOf(false) }
     var detailsExpanded by remember { mutableStateOf(false) }
 
@@ -189,7 +198,9 @@ fun EditorPage(
                         title = uiState.title,
                         onTitleChange = { viewModel.updateTitle(it) },
                         onBack = nav.back,
-                        onSave = { viewModel.save { nav.toHomeAndClear() } },
+                        // Existing note: pop back to the reader (which live-updates via
+                        // observeNote). New note: clear back to Home.
+                        onSave = { viewModel.save { if (noteId == null) nav.toHomeAndClear() else nav.back() } },
                         overflow = {
                             // Overflow menu (templates) is only reachable on a NEW note so an
                             // existing note's content is never silently replaced by a template.
@@ -217,6 +228,21 @@ fun EditorPage(
                         detailsExpanded = detailsExpanded,
                         onToggleDetails = { detailsExpanded = !detailsExpanded }
                     )
+                    AnimatedVisibility(visible = findActive, enter = expandVertically(), exit = shrinkVertically()) {
+                        FindBar(
+                            query = findQuery,
+                            onQueryChange = { findQuery = it; viewModel.updateFind(it) },
+                            matchCount = uiState.findMatches.size,
+                            matchIndex = uiState.findIndex,
+                            onPrev = { viewModel.findPrev() },
+                            onNext = { viewModel.findNext() },
+                            onClose = {
+                                findActive = false
+                                findQuery = ""
+                                viewModel.clearFind()
+                            }
+                        )
+                    }
                     AnimatedVisibility(visible = detailsExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                         MetaPanel(
                             title = uiState.title,
@@ -227,6 +253,9 @@ fun EditorPage(
                             moodLabel = moodLabel,
                             date = uiState.date,
                             coverImagePath = uiState.coverImagePath,
+                            tagNames = uiState.tagNames,
+                            onAddTag = { viewModel.addTag(it) },
+                            onRemoveTag = { viewModel.removeTag(it) },
                             onPickCoverImage = { coverImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onRemoveCoverImage = { viewModel.removeCoverImage() },
                             onPickWeather = { showWeather = true },
@@ -249,6 +278,10 @@ fun EditorPage(
                     onQuote = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.QUOTE) },
                     onBullet = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.BULLET) },
                     onNumbered = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.NUMBERED) },
+                    onCheckbox = { viewModel.setParagraphStyle(viewModel.focusedIndex, ParagraphStyle.CHECKBOX) },
+                    onCode = { viewModel.toggleCode() },
+                    onLink = { showLink = true },
+                    onFind = { findActive = true },
                     onImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     onAlign = { a -> viewModel.setParagraphAlignment(viewModel.focusedIndex, a) },
                     onIndent = { d -> viewModel.setIndentLevel(viewModel.focusedIndex, d) },
@@ -261,6 +294,14 @@ fun EditorPage(
         }
     }
 
+    if (showLink) {
+        LinkDialog(
+            hasLinkAtCursor = uiState.linkAtCursor,
+            onApply = { url -> viewModel.setLinkOnSelection(url); showLink = false },
+            onRemove = { viewModel.clearLinkOnSelection(); showLink = false },
+            onDismiss = { showLink = false }
+        )
+    }
     if (showDate) NkDatePicker(initial = uiState.date, onDate = { viewModel.updateDate(it); showDate = false }, onDismiss = { showDate = false })
     if (showWeather) WeatherPickerDialog(onPick = { viewModel.updateWeather(it); showWeather = false }, onDismiss = { showWeather = false })
     if (showMood) MoodPickerDialog(onPick = { viewModel.updateMood(it); showMood = false }, onDismiss = { showMood = false })
@@ -306,20 +347,102 @@ private fun EditorTopBar(
                 IconButton(onClick = onToggleDetails) {
                     Icon(
                         Icons.Filled.ExpandMore,
-                        contentDescription = stringResource(R.string.editor_select_date),
+                        contentDescription = stringResource(R.string.editor_description),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.rotate(arrowRotation)
                     )
                 }
             }
         },
-        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
+        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) } },
         actions = {
             overflow()
             IconButton(onClick = onSave) { Icon(Icons.Filled.Check, stringResource(R.string.editor_save)) }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
     )
+}
+
+// ── Find-in-page bar (rendered under the top bar while active) ─────────────────
+
+@Composable
+private fun FindBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    matchCount: Int,
+    matchIndex: Int,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit
+) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = NkSpacing.md, vertical = NkSpacing.xs)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.editor_find_placeholder)) },
+                shape = NkShapes.mediumSmall,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(NkSpacing.sm))
+            Text(
+                text = if (matchCount == 0 && query.isNotEmpty()) stringResource(R.string.editor_find_no_matches)
+                else if (matchCount > 0) "${matchIndex + 1}/$matchCount" else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            IconButton(onClick = onPrev, enabled = matchCount > 0) {
+                Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.editor_find_prev), modifier = Modifier.size(NkIconSize.md))
+            }
+            IconButton(onClick = onNext, enabled = matchCount > 0) {
+                Icon(Icons.Filled.KeyboardArrowDown, stringResource(R.string.editor_find_next), modifier = Modifier.size(NkIconSize.md))
+            }
+            IconButton(onClick = onClose) {
+                Icon(Icons.Filled.Close, stringResource(R.string.common_close), modifier = Modifier.size(NkIconSize.md))
+            }
+        }
+    }
+}
+
+// ── Link dialog ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LinkDialog(
+    hasLinkAtCursor: Boolean,
+    onApply: (String) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var url by remember { mutableStateOf("") }
+    NkDialog(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.editor_link_dialog_title),
+        confirmText = stringResource(R.string.editor_link_apply),
+        onConfirm = { if (url.isNotBlank()) onApply(url) else onDismiss() },
+        dismissText = stringResource(R.string.common_cancel)
+    ) {
+        Column {
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.editor_link_url_label)) },
+                placeholder = { Text("https://") },
+                shape = NkShapes.mediumSmall,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (hasLinkAtCursor) {
+                TextButton(onClick = onRemove) {
+                    Text(stringResource(R.string.editor_link_remove), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
 }
 
 // ── Collapsed-by-default meta panel ────────────────────────────────────────────
@@ -334,6 +457,9 @@ private fun MetaPanel(
     moodLabel: String,
     date: String,
     coverImagePath: String?,
+    tagNames: List<String>,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit,
     onPickCoverImage: () -> Unit,
     onRemoveCoverImage: () -> Unit,
     onPickWeather: () -> Unit,
@@ -355,12 +481,75 @@ private fun MetaPanel(
                 label = { Text(stringResource(R.string.editor_description)) },
                 shape = NkShapes.mediumSmall, modifier = Modifier.fillMaxWidth()
             )
+            TagsSection(tagNames = tagNames, onAddTag = onAddTag, onRemoveTag = onRemoveTag)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetaChip(text = weatherLabel, fallback = stringResource(R.string.editor_select_weather), onClick = onPickWeather)
                 MetaChip(text = moodLabel, fallback = stringResource(R.string.editor_select_mood), onClick = onPickMood)
                 MetaChip(text = date, fallback = stringResource(R.string.editor_select_date), onClick = onPickDate)
             }
         }
+    }
+}
+
+/** Tag chips + inline input. Tags persist on save via [EditorViewModel.persistTags]. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagsSection(
+    tagNames: List<String>,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit
+) {
+    var input by remember { mutableStateOf("") }
+    Column {
+        if (tagNames.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(NkSpacing.xs),
+                verticalArrangement = Arrangement.spacedBy(NkSpacing.xs)
+            ) {
+                tagNames.forEach { name ->
+                    val tagColor = io.github.nknote.ui.editor.richtext.parseHexColor(
+                        io.github.nknote.data.entity.Tag.colorFor(name)
+                    ) ?: MaterialTheme.colorScheme.primary
+                    Surface(color = tagColor.copy(alpha = 0.14f), shape = NkShapes.small) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = NkSpacing.sm, end = NkSpacing.xs, top = 2.dp, bottom = 2.dp)
+                        ) {
+                            Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                            IconButton(onClick = { onRemoveTag(name) }, modifier = Modifier.size(NkIconSize.lg)) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.common_close),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(NkIconSize.sm)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(NkSpacing.xs))
+        }
+        OutlinedTextField(
+            value = input,
+            onValueChange = { input = it },
+            singleLine = true,
+            label = { Text(stringResource(R.string.editor_tags)) },
+            placeholder = { Text(stringResource(R.string.editor_tag_input_placeholder)) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onDone = {
+                    if (input.isNotBlank()) {
+                        onAddTag(input)
+                        input = ""
+                    }
+                }
+            ),
+            shape = NkShapes.mediumSmall,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -412,6 +601,24 @@ private fun EditorContent(
 ) {
     val focusRequesters = remember { androidx.compose.runtime.mutableStateListOf<FocusRequester>() }
     while (focusRequesters.size < viewModel.paragraphs.size) focusRequesters.add(FocusRequester())
+    while (focusRequesters.size > viewModel.paragraphs.size) focusRequesters.removeAt(focusRequesters.lastIndex)
+
+    // Inline-image delete confirmation (file deletion is permanent and not undoable).
+    var pendingImageDelete by remember { mutableStateOf<Int?>(null) }
+    pendingImageDelete?.let { target ->
+        NkDialog(
+            onDismiss = { pendingImageDelete = null },
+            title = stringResource(R.string.editor_delete_image),
+            confirmText = stringResource(R.string.common_confirm),
+            onConfirm = {
+                viewModel.removeImageParagraph(target)
+                pendingImageDelete = null
+            },
+            dismissText = stringResource(R.string.common_cancel)
+        ) {
+            Text(stringResource(R.string.editor_delete_image_confirm), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 
     // Column + verticalScroll (NOT LazyColumn): EditorParagraph has no stable id and BasicTextField
     // loses focus on LazyColumn item recycling. Diary-length docs compose fine in a Column.
@@ -420,17 +627,25 @@ private fun EditorContent(
     // used by scroll-to-focused: when pendingFocusIndex triggers, animateScrollTo the target's y.
     val paragraphOffsets = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     while (paragraphOffsets.size < viewModel.paragraphs.size) paragraphOffsets.add(0)
+    while (paragraphOffsets.size > viewModel.paragraphs.size) paragraphOffsets.removeAt(paragraphOffsets.lastIndex)
 
     LaunchedEffect(viewModel.pendingFocusIndex) {
         val idx = viewModel.pendingFocusIndex
         if (idx >= 0 && idx < focusRequesters.size) {
             // Scroll the focused paragraph into view, then request focus so the layout has settled.
-            val target = paragraphOffsets.getOrNull(idx) ?: 0
+            // Offsets are content-space (positionInParent of a direct child of the scrolled
+            // Column), so they feed animateScrollTo directly; back off a small margin so the
+            // paragraph isn't flush with the top edge.
+            val target = ((paragraphOffsets.getOrNull(idx) ?: 0) - 48).coerceAtLeast(0)
             runCatching { scrollState.animateScrollTo(target) }
             runCatching { focusRequesters[idx].requestFocus() }
             viewModel.consumePendingFocus()
         }
     }
+
+    // Find-in-page matches drive per-paragraph highlight overlays.
+    val editorUiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val findMatches = editorUiState.findMatches
 
     Column(
         modifier = Modifier
@@ -448,10 +663,11 @@ private fun EditorContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onGloballyPositioned { coords ->
-                        // Content-space y-offset = on-screen position + current scroll offset.
+                        // This Box is a direct child of the scrolled Column, so positionInParent
+                        // IS the content-space y-offset — no root-space + scroll math (which
+                        // double-counted the top bar height and overshot).
                         if (index < paragraphOffsets.size) {
-                            paragraphOffsets[index] =
-                                (coords.positionInRoot().y + scrollState.value).toInt()
+                            paragraphOffsets[index] = coords.positionInParent().y.toInt()
                         }
                     }
             ) {
@@ -459,15 +675,42 @@ private fun EditorContent(
                     ImageBlock(
                         path = para.image.path,
                         aspectRatio = para.image.width.toFloat() / para.image.height.toFloat(),
-                        onLongPress = { nav.toViewer(para.image.path) }
+                        onLongPress = { nav.toViewer(para.image.path) },
+                        onDelete = { pendingImageDelete = index }
                     )
                 } else {
-                    ParagraphField(
-                        index = index,
-                        viewModel = viewModel,
-                        focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester(),
-                        numberedCounter = counters.getOrNull(index) ?: 0
-                    )
+                    val requester = focusRequesters.getOrNull(index) ?: return@Box
+                    val paraHighlights = remember(findMatches, index) {
+                        findMatches.filter { it.paragraphIndex == index }
+                            .map { HighlightRange(it.start, it.end) }
+                    }
+                    val field = @Composable {
+                        ParagraphField(
+                            index = index,
+                            viewModel = viewModel,
+                            focusRequester = requester,
+                            numberedCounter = counters.getOrNull(index) ?: 0,
+                            highlights = paraHighlights,
+                            showPlaceholder = index == 0 && viewModel.paragraphs.size == 1 &&
+                                para.text.isEmpty() && para.image == null &&
+                                para.style == ParagraphStyle.BODY
+                        )
+                    }
+                    if (para.style == ParagraphStyle.CHECKBOX) {
+                        // Task-list item: a real Checkbox composable leads the field — a genuine
+                        // tap target instead of a text marker with offset gymnastics.
+                        Row(verticalAlignment = Alignment.Top) {
+                            Checkbox(
+                                checked = para.checked,
+                                onCheckedChange = { viewModel.toggleChecked(index) },
+                                modifier = Modifier.size(NkIconSize.xl)
+                            )
+                            Spacer(Modifier.width(NkSpacing.sm))
+                            Box(Modifier.weight(1f)) { field() }
+                        }
+                    } else {
+                        field()
+                    }
                 }
             }
         }
@@ -488,7 +731,9 @@ private fun ParagraphField(
     index: Int,
     viewModel: EditorViewModel,
     focusRequester: FocusRequester,
-    numberedCounter: Int
+    numberedCounter: Int,
+    highlights: List<HighlightRange> = emptyList(),
+    showPlaceholder: Boolean = false
 ) {
     val para = viewModel.paragraphs[index]
     val value = viewModel.fields.getOrNull(index) ?: TextFieldValue("")
@@ -498,49 +743,53 @@ private fun ParagraphField(
         ParagraphAlignment.CENTER -> TextAlign.Center
         ParagraphAlignment.END -> TextAlign.End
     }
-    val transformation = remember(para, numberedCounter, codeBackground) {
-        SpanVisualTransformation(para, numberedCounter, codeBackground)
+    val transformation = remember(para, numberedCounter, codeBackground, highlights) {
+        SpanVisualTransformation(
+            paragraph = para,
+            numberedCounter = numberedCounter,
+            codeBackground = codeBackground,
+            highlights = highlights,
+            guardPrefixLength = 1
+        )
     }
 
     BasicTextField(
         value = value,
-        onValueChange = { tv ->
-            val nl = tv.text.indexOf('\n')
-            if (nl >= 0) {
-                viewModel.splitParagraph(index, tv.text.substring(0, nl), tv.text.substring(nl + 1))
-            } else {
-                viewModel.onTextChange(index, tv)
-            }
-        },
+        // All routing (Enter/paste newline handling, soft-keyboard backspace-merge via the
+        // sentinel guard, selection-only moves) lives in the ViewModel's onTextChange front door.
+        onValueChange = { tv -> viewModel.onTextChange(index, tv) },
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = textAlign
         ),
         visualTransformation = transformation,
         cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+        decorationBox = { inner ->
+            if (showPlaceholder) {
+                Box {
+                    Text(
+                        stringResource(R.string.editor_content_placeholder),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    inner()
+                }
+            } else inner()
+        },
         modifier = Modifier
             .fillMaxWidth()
             // Issue 6: minimum height so empty paragraphs are easy to tap
             .heightIn(min = 32.dp)
             .focusRequester(focusRequester)
+            .onFocusChanged { if (it.isFocused) viewModel.onFocus(index) }
             .onPreviewKeyEvent { keyEvent ->
-                when {
-                    // Ctrl+Z = undo, Ctrl+Shift+Z = redo (hardware keyboard).
-                    keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Z && keyEvent.isCtrlPressed -> {
-                        if (keyEvent.isShiftPressed) viewModel.redo() else viewModel.undo()
-                        true
-                    }
-                    keyEvent.type == KeyEventType.KeyUp &&
-                        keyEvent.key == Key.Backspace &&
-                        value.selection.start == 0 &&
-                        value.selection.end == 0 &&
-                        index > 0
-                    -> {
-                        viewModel.mergeWithPrevious(index)
-                        true
-                    }
-                    else -> false
-                }
+                // Ctrl+Z = undo, Ctrl+Shift+Z = redo (hardware keyboard). A hardware backspace
+                // at paragraph start deletes the sentinel guard and flows through onTextChange —
+                // the same path a soft keyboard takes — so no key-event merge branch is needed.
+                if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Z && keyEvent.isCtrlPressed) {
+                    if (keyEvent.isShiftPressed) viewModel.redo() else viewModel.undo()
+                    true
+                } else false
             }
             .padding(vertical = 4.dp)
     )
@@ -550,22 +799,41 @@ private fun ParagraphField(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ImageBlock(path: String, aspectRatio: Float, onLongPress: () -> Unit) {
+private fun ImageBlock(path: String, aspectRatio: Float, onLongPress: () -> Unit, onDelete: () -> Unit) {
     // Auto-scale: height derived from aspect ratio, capped to keep images reasonable
     val heightDp = (300f / aspectRatio.coerceIn(0.5f, 3f)).coerceIn(80f, 300f)
-    AsyncImage(
-        model = path,
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(heightDp.dp)
-            .clip(NkShapes.small)
-            .combinedClickable(
-                onClick = {},
-                onLongClick = onLongPress
-            )
-    )
+    Box(modifier = Modifier.fillMaxWidth().height(heightDp.dp)) {
+        AsyncImage(
+            model = path,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(NkShapes.small)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongPress
+                )
+        )
+        // Visible delete affordance — the only reliable way to remove an image with a soft
+        // keyboard used to be a backspace merge; this button works everywhere.
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.align(Alignment.TopEnd).padding(NkSpacing.xs)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                shape = NkShapes.small
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.editor_delete_image),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(2.dp).size(NkIconSize.md)
+                )
+            }
+        }
+    }
 }
 
 // ── Soft format bar with scroll-edge fade hint ──────────────────────────────────
@@ -593,19 +861,20 @@ private fun FormatBar(
     onBold: () -> Unit, onItalic: () -> Unit, onUnderline: () -> Unit, onStrike: () -> Unit,
     onColor: () -> Unit, onSize: () -> Unit,
     onParagraphStyle: (ParagraphStyle) -> Unit,
-    onQuote: () -> Unit, onBullet: () -> Unit, onNumbered: () -> Unit,
+    onQuote: () -> Unit, onBullet: () -> Unit, onNumbered: () -> Unit, onCheckbox: () -> Unit,
+    onCode: () -> Unit, onLink: () -> Unit, onFind: () -> Unit,
     onImage: () -> Unit,
     onAlign: (ParagraphAlignment) -> Unit,
     onIndent: (Int) -> Unit,
     onUndo: () -> Unit, onRedo: () -> Unit
 ) {
-    val scrollState = rememberScrollState()
     val bgColor = MaterialTheme.colorScheme.background
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     var headingMenuExpanded by remember { mutableStateOf(false) }
+    var moreExpanded by remember { mutableStateOf(false) }
 
-    // Active-state predicates — derived from the cursor's span style (todo 7 styleAtCursor) and
-    // the focused paragraph's paragraph-level state (todo 10).
+    // Active-state predicates — derived from the cursor's span style (incl. armed sticky
+    // overrides) and the focused paragraph's paragraph-level state.
     val spanStyle = state.styleAtCursor
     val boldToggled = spanStyle?.fontWeight == FontWeight.Bold
     val italicToggled = spanStyle?.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic
@@ -623,9 +892,45 @@ private fun FormatBar(
             .background(Brush.verticalGradient(listOf(Color.Transparent, bgColor.copy(alpha = 0.85f), bgColor)))
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(borderColor.copy(alpha = 0.5f)))
+
+        // ── "More" tier: expands ABOVE the primary row ──
+        AnimatedVisibility(visible = moreExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = NkSpacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Fmt(Icons.Filled.FormatColorText, R.string.editor_format_color, onColor)
+                Fmt(Icons.Filled.FormatSize, R.string.editor_format_size, onSize)
+                Fmt(Icons.Filled.FormatQuote, R.string.editor_format_quote, onQuote, toggled = pStyle == ParagraphStyle.QUOTE)
+                Fmt(Icons.Filled.Code, R.string.editor_format_code, onCode, toggled = state.codeAtCursor)
+                Fmt(Icons.Filled.Link, R.string.editor_format_link, onLink, toggled = state.linkAtCursor)
+                Fmt(Icons.Filled.Search, R.string.editor_format_find, onFind)
+                Fmt(Icons.AutoMirrored.Filled.FormatAlignLeft, R.string.editor_align_left,
+                    { onAlign(ParagraphAlignment.START) }, toggled = pAlign == ParagraphAlignment.START)
+                Fmt(Icons.Filled.FormatAlignCenter, R.string.editor_align_center,
+                    { onAlign(ParagraphAlignment.CENTER) }, toggled = pAlign == ParagraphAlignment.CENTER)
+                Fmt(Icons.AutoMirrored.Filled.FormatAlignRight, R.string.editor_align_right,
+                    { onAlign(ParagraphAlignment.END) }, toggled = pAlign == ParagraphAlignment.END)
+                Fmt(Icons.AutoMirrored.Filled.FormatIndentIncrease, R.string.editor_indent, { onIndent(+1) })
+                Fmt(Icons.AutoMirrored.Filled.FormatIndentDecrease, R.string.editor_outdent, { onIndent(-1) }, enabled = indentLevel > 0)
+                Fmt(Icons.Filled.Image, R.string.editor_insert_image, onImage)
+                Spacer(Modifier.width(NkSpacing.sm))
+                Text(
+                    text = stringResource(R.string.editor_word_char_count, state.wordCount, state.charCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = NkSpacing.sm)
+                )
+            }
+        }
+
+        // ── Primary tier ──
+        val primaryScroll = rememberScrollState()
         Box(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)
+                modifier = Modifier.fillMaxWidth().horizontalScroll(primaryScroll)
                     .padding(horizontal = NkSpacing.xs, vertical = NkSpacing.xs),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -637,14 +942,12 @@ private fun FormatBar(
                 Fmt(Icons.Filled.FormatItalic, R.string.editor_format_italic, onItalic, toggled = italicToggled)
                 Fmt(Icons.Filled.FormatUnderlined, R.string.editor_format_underline, onUnderline, toggled = underlineToggled)
                 Fmt(Icons.Filled.FormatStrikethrough, R.string.editor_format_strikethrough, onStrike, toggled = strikeToggled)
-                Fmt(Icons.Filled.FormatColorText, R.string.editor_format_color, onColor)
-                Fmt(Icons.Filled.FormatSize, R.string.editor_format_size, onSize)
 
                 // Heading hierarchy picker: Title / Heading / Subheading / Body.
                 Box {
                     IconButton(onClick = { headingMenuExpanded = true }) {
                         Icon(
-                            Icons.Filled.FormatSize,
+                            Icons.Filled.Title,
                             stringResource(R.string.editor_format_heading),
                             tint = if (pStyle == ParagraphStyle.TITLE || pStyle == ParagraphStyle.HEADING ||
                                 pStyle == ParagraphStyle.SUBHEADING) {
@@ -652,7 +955,7 @@ private fun FormatBar(
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             },
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(NkIconSize.md)
                         )
                     }
                     DropdownMenu(expanded = headingMenuExpanded, onDismissRequest = { headingMenuExpanded = false }) {
@@ -671,30 +974,27 @@ private fun FormatBar(
                     }
                 }
 
-                Fmt(Icons.Filled.FormatQuote, R.string.editor_format_quote, onQuote, toggled = pStyle == ParagraphStyle.QUOTE)
                 Fmt(Icons.AutoMirrored.Filled.FormatListBulleted, R.string.editor_format_bullet, onBullet, toggled = pStyle == ParagraphStyle.BULLET)
                 Fmt(Icons.Filled.FormatListNumbered, R.string.editor_format_numbered, onNumbered, toggled = pStyle == ParagraphStyle.NUMBERED)
+                Fmt(Icons.Filled.CheckBox, R.string.editor_format_checkbox, onCheckbox, toggled = pStyle == ParagraphStyle.CHECKBOX)
 
-                // Alignment group (Left / Center / Right) — each button highlighted for the current alignment.
-                Fmt(Icons.AutoMirrored.Filled.FormatAlignLeft, R.string.editor_align_left,
-                    { onAlign(ParagraphAlignment.START) }, toggled = pAlign == ParagraphAlignment.START)
-                Fmt(Icons.Filled.FormatAlignCenter, R.string.editor_align_center,
-                    { onAlign(ParagraphAlignment.CENTER) }, toggled = pAlign == ParagraphAlignment.CENTER)
-                Fmt(Icons.AutoMirrored.Filled.FormatAlignRight, R.string.editor_align_right,
-                    { onAlign(ParagraphAlignment.END) }, toggled = pAlign == ParagraphAlignment.END)
-
-                // Indent / outdent. Outdent is disabled at indent 0 so it can never go negative.
-                Fmt(Icons.AutoMirrored.Filled.FormatIndentIncrease, R.string.editor_indent, { onIndent(+1) }, toggled = indentLevel > 0)
-                Fmt(Icons.AutoMirrored.Filled.FormatIndentDecrease, R.string.editor_outdent, { onIndent(-1) }, enabled = indentLevel > 0)
-
-                Fmt(Icons.Filled.Image, R.string.editor_insert_image, onImage)
+                val moreRotation by animateFloatAsState(targetValue = if (moreExpanded) 180f else 0f, label = "more_arrow")
+                IconButton(onClick = { moreExpanded = !moreExpanded }) {
+                    Icon(
+                        Icons.Filled.ExpandLess,
+                        contentDescription = stringResource(R.string.editor_format_more),
+                        tint = if (moreExpanded) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(NkIconSize.md).rotate(moreRotation)
+                    )
+                }
             }
-            // Scroll-edge fade hints (unchanged from the original FormatBar).
-            if (scrollState.maxValue > 0 && scrollState.value < scrollState.maxValue) {
+            // Scroll-edge fade hints for narrow screens.
+            if (primaryScroll.maxValue > 0 && primaryScroll.value < primaryScroll.maxValue) {
                 Box(modifier = Modifier.width(20.dp).height(48.dp).align(Alignment.CenterEnd)
                     .background(Brush.horizontalGradient(listOf(Color.Transparent, bgColor))))
             }
-            if (scrollState.value > 0) {
+            if (primaryScroll.value > 0) {
                 Box(modifier = Modifier.width(20.dp).height(48.dp).align(Alignment.CenterStart)
                     .background(Brush.horizontalGradient(listOf(bgColor, Color.Transparent))))
             }
@@ -730,7 +1030,7 @@ private fun Fmt(
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
     IconButton(onClick = onClick, enabled = enabled) {
-        Icon(icon, stringResource(desc), tint = tint, modifier = Modifier.size(20.dp))
+        Icon(icon, stringResource(desc), tint = tint, modifier = Modifier.size(NkIconSize.md))
     }
 }
 

@@ -4,6 +4,7 @@ import io.github.nknote.data.db.NoteDao
 import io.github.nknote.data.db.NoteTagDao
 import io.github.nknote.data.db.TagDao
 import io.github.nknote.data.entity.Note
+import io.github.nknote.data.entity.NoteTag
 import io.github.nknote.data.entity.Tag
 import io.github.nknote.data.image.ImageStore
 import io.github.nknote.model.RichDocument
@@ -34,6 +35,7 @@ class NoteRepositoryImpl(
     override fun observeNotesOnDate(date: String): Flow<List<Note>> = noteDao.observeByDate(date)
     override fun observeNotesOnMonthDay(monthDay: String): Flow<List<Note>> = noteDao.observeByMonthDay(monthDay)
     override suspend fun allDates(): List<String> = noteDao.allDates()
+    override fun observeAllDates(): Flow<List<String>> = noteDao.observeAllDates()
 
     override suspend fun insertNote(note: Note): Long = noteDao.insert(deriveSearchFields(note))
 
@@ -49,6 +51,7 @@ class NoteRepositoryImpl(
     override suspend fun permanentlyDelete(id: Int) {
         noteDao.deleteById(id)
         imageStore.deleteAllForNote(id)
+        tagDao.deleteOrphans()
     }
 
     /**
@@ -59,6 +62,7 @@ class NoteRepositoryImpl(
         val ids = noteDao.getDeletedIds()
         noteDao.emptyTrash()
         ids.forEach { imageStore.deleteAllForNote(it) }
+        tagDao.deleteOrphans()
     }
 
     override fun observeTags(): Flow<List<Tag>> = tagDao.observeAll()
@@ -67,13 +71,23 @@ class NoteRepositoryImpl(
     override suspend fun deleteTag(id: String) = tagDao.deleteById(id)
 
     override fun observeTagsForNote(noteId: Int): Flow<List<Tag>> = noteTagDao.observeTagsForNote(noteId)
+    override fun observeNotesForTag(tagId: String): Flow<List<Note>> = noteTagDao.observeNotesForTag(tagId)
+    override fun observeAllNoteTags(): Flow<List<NoteTag>> = noteTagDao.observeAll()
+    override suspend fun getAllNoteTags(): List<NoteTag> = noteTagDao.getAll()
 
-    /** Delegates to the transactional [NoteTagDao.setNoteTags] (clear+insert in one Room transaction). */
-    override suspend fun setNoteTags(noteId: Int, tagIds: List<String>) =
+    /**
+     * Delegates to the transactional [NoteTagDao.setNoteTags] (clear+insert in one Room
+     * transaction), then drops tags no note references anymore — tag lifecycle is automatic.
+     */
+    override suspend fun setNoteTags(noteId: Int, tagIds: List<String>) {
         noteTagDao.setNoteTags(noteId, tagIds)
+        tagDao.deleteOrphans()
+    }
 
     override suspend fun addTagToNote(noteId: Int, tagId: String) =
-        noteTagDao.insert(io.github.nknote.data.entity.NoteTag(noteId, tagId))
+        noteTagDao.insert(NoteTag(noteId, tagId))
+
+    override suspend fun deleteOrphanTags() = tagDao.deleteOrphans()
 
     /**
      * Derives [Note.searchText] (plain-text of [Note.content] via [RichDocument.plainText]) and
@@ -86,6 +100,12 @@ class NoteRepositoryImpl(
             json.decodeFromString(RichDocument.serializer(), note.content).plainText()
         }.getOrDefault("")
         val monthDay = if (note.date.length >= 10) note.date.substring(5) else note.date
-        return note.copy(searchText = plain, monthDay = monthDay)
+        // A blank excerpt is auto-derived (first non-blank line, 80 chars — the same rule
+        // TextImporter applies) so every writer gets a usable preview and FTS column.
+        // A manually written excerpt is never overwritten.
+        val excerpt = note.excerpt.ifBlank {
+            plain.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(80).orEmpty()
+        }
+        return note.copy(searchText = plain, monthDay = monthDay, excerpt = excerpt)
     }
 }

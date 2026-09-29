@@ -157,6 +157,79 @@ class EditorAutosaveTest {
         assertEquals(false, vm.uiState.value.canUndo)
     }
 
+    @Test
+    fun pristineNewNote_save_insertsNoRow() = runTest {
+        val vm = EditorViewModel(null, imageStore, repo, SavedStateHandle())
+        // No edits at all — the ON_STOP autosave of a backed-out empty editor must not
+        // leave a junk row.
+        vm.save { }.join()
+        assertEquals(0, repo.observeAllNotes().first().size)
+
+        // One keystroke later the note becomes real.
+        vm.onTextChange(0, TextFieldValue("x", TextRange(1, 1)))
+        vm.save { }.join()
+        assertEquals(1, repo.observeAllNotes().first().size)
+    }
+
+    @Test
+    fun navigationOnly_doesNotBumpEditVersion() = runTest {
+        val vm = EditorViewModel(null, imageStore, repo, SavedStateHandle())
+        vm.onTextChange(0, TextFieldValue("findable text", TextRange(13, 13)))
+        val versionAfterEdit = vm.editVersion
+
+        vm.updateFind("find")
+        vm.findNext()
+        vm.findPrev()
+        vm.focusLastTextParagraph()
+
+        assertEquals(
+            "find navigation / focus moves must not schedule an autosave",
+            versionAfterEdit, vm.editVersion
+        )
+
+        // A real edit still bumps it.
+        vm.onTextChange(0, TextFieldValue("findable texts", TextRange(14, 14)))
+        assertNotEquals(versionAfterEdit, vm.editVersion)
+    }
+
+    @Test
+    fun firstSave_rehomesProvisionalImages() = runTest {
+        val recording = RecordingImageStore()
+        val vm = EditorViewModel(null, recording, repo, SavedStateHandle())
+        vm.onTextChange(0, TextFieldValue("with image", TextRange(10, 10)))
+        vm.insertImageAfter(0, Uri.parse("content://test/img"))
+
+        vm.save { }.join()
+
+        val savedId = repo.observeAllNotes().first().single().id
+        assertEquals(
+            "relocateToNote must be called with the inserted row id",
+            listOf("/tmp/images/0/img.webp" to savedId), recording.relocations
+        )
+        // The document now carries the re-homed path.
+        val content = repo.observeAllNotes().first().single().content
+        org.junit.Assert.assertTrue(content.contains("/tmp/images/$savedId/img.webp"))
+
+        // Second save: path already correct → no further relocation.
+        vm.updateTitle("edited")
+        vm.save { }.join()
+        assertEquals(1, recording.relocations.size)
+    }
+
+    /** Records relocate calls; simulates the provisional images/0 → images/<id> move. */
+    private class RecordingImageStore : ImageStore {
+        val relocations = mutableListOf<Pair<String, Int>>()
+        override fun saveForNote(noteId: Int, source: Uri): String? = "/tmp/images/$noteId/img.webp"
+        override fun delete(path: String) {}
+        override fun deleteAllForNote(noteId: Int) {}
+        override fun exists(path: String): Boolean = true
+        override fun relocateToNote(path: String, noteId: Int): String {
+            if (path.contains("/images/$noteId/")) return path
+            relocations.add(path to noteId)
+            return "/tmp/images/$noteId/img.webp"
+        }
+    }
+
     /** A minimal [LifecycleOwner] backed by a real [LifecycleRegistry]. */
     private class TestLifecycleOwner : LifecycleOwner {
         val registry = LifecycleRegistry.createUnsafe(this)
@@ -169,5 +242,6 @@ class EditorAutosaveTest {
         override fun delete(path: String) {}
         override fun deleteAllForNote(noteId: Int) {}
         override fun exists(path: String): Boolean = false
+        override fun relocateToNote(path: String, noteId: Int): String = path
     }
 }

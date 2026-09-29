@@ -29,11 +29,18 @@ data class RichParagraph(
     val style: ParagraphStyle = ParagraphStyle.BODY,
     val image: InlineImage? = null,
     val alignment: ParagraphAlignment = ParagraphAlignment.START,
-    val indentLevel: Int = 0   // 0..3; clamped at the editor/toolbar layer
+    val indentLevel: Int = 0,  // 0..3; clamped at the editor/toolbar layer
+    val checked: Boolean = false   // v3: meaningful only for ParagraphStyle.CHECKBOX
 )
 
+/**
+ * v3 adds CHECKBOX (task-list item). Enum values are appended, never reordered. Note the
+ * one-way compatibility: `ignoreUnknownKeys` does NOT cover unknown enum VALUES, so an old
+ * APK decoding a CHECKBOX note falls back to an empty editor document via its existing
+ * `runCatching` guards — no crash, and the JSON in the DB is untouched.
+ */
 @Serializable
-enum class ParagraphStyle { TITLE, HEADING, SUBHEADING, BODY, QUOTE, BULLET, NUMBERED, CODE }
+enum class ParagraphStyle { TITLE, HEADING, SUBHEADING, BODY, QUOTE, BULLET, NUMBERED, CODE, CHECKBOX }
 
 @Serializable
 enum class ParagraphAlignment { START, CENTER, END }

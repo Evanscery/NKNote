@@ -2,7 +2,6 @@ package io.github.nknote.ui.viewer
 
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,8 +21,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -37,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -48,6 +46,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.nknote.AppViewModelFactory
 import io.github.nknote.R
+import io.github.nknote.ui.components.LocalSnackbarHostState
+import io.github.nknote.ui.components.NkDialog
+import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.navigation.NkNoteNavigation
 import io.github.nknote.ui.theme.NkNoteTheme
 import kotlinx.coroutines.launch
@@ -63,10 +64,14 @@ fun ImageViewerPage(
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val density = LocalDensity.current
+    val snackbar = LocalSnackbarHostState.current
+    val haptics = LocalHapticFeedback.current
+    val shareFailedMsg = stringResource(R.string.viewer_share_failed)
     // Vertical-swipe distance required to trigger dismiss. Larger than the gesture slop so an
     // accidental drag doesn't leave the viewer; tuned to feel like a deliberate fling.
     val dismissThresholdPx = with(density) { 160.dp.toPx() }
@@ -80,40 +85,24 @@ fun ImageViewerPage(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.scrim,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.viewer_title),
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = nav.back) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                        }
-                    },
+                NkTopAppBar(
+                    title = stringResource(R.string.viewer_title),
+                    onBack = nav.back,
+                    centerTitle = true,
+                    containerColor = Color.Transparent,
                     actions = {
                         IconButton(onClick = {
                             val intent = viewModel.buildShareIntent(imagePath)
                             if (intent != null) {
                                 context.startActivity(Intent.createChooser(intent, null))
                             } else {
-                                Toast.makeText(
-                                    context,
-                                    R.string.viewer_share_failed,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                scope.launch { snackbar.showSnackbar(shareFailedMsg) }
                             }
                         }) { Icon(Icons.Filled.Share, stringResource(R.string.viewer_share)) }
-                        IconButton(onClick = {
-                            viewModel.delete(imagePath)
-                            nav.back()
-                        }) { Icon(Icons.Filled.DeleteOutline, stringResource(R.string.viewer_delete)) }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                        IconButton(onClick = { confirmDelete = true }) {
+                            Icon(Icons.Filled.DeleteOutline, stringResource(R.string.viewer_delete))
+                        }
+                    }
                 )
             }
         ) { padding ->
@@ -232,6 +221,23 @@ fun ImageViewerPage(
                             .graphicsLayer { alpha = dismissAlpha }
                     )
                 }
+            }
+        }
+
+        if (confirmDelete) {
+            NkDialog(
+                onDismiss = { confirmDelete = false },
+                title = stringResource(R.string.viewer_delete),
+                confirmText = stringResource(R.string.common_confirm),
+                onConfirm = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    confirmDelete = false
+                    viewModel.delete(imagePath)
+                    nav.back()
+                },
+                dismissText = stringResource(R.string.common_cancel)
+            ) {
+                Text(stringResource(R.string.viewer_delete_confirm), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

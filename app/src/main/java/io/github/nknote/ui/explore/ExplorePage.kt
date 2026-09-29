@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import io.github.nknote.data.entity.Note
 import io.github.nknote.model.Mood
 import io.github.nknote.model.Weather
 import io.github.nknote.ui.components.MoodIconMap
+import io.github.nknote.ui.components.NkEmptyState
 import io.github.nknote.ui.components.NkNoteCard
 import io.github.nknote.ui.components.NkTopAppBar
 import io.github.nknote.ui.components.WeatherIconMap
@@ -48,14 +51,14 @@ import io.github.nknote.ui.theme.NkNoteTheme
 import io.github.nknote.ui.theme.NkShapes
 import io.github.nknote.ui.theme.NkSpacing
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ExplorePage(
     nav: NkNoteNavigation,
     openNote: (Int) -> Unit,
     viewModel: ExploreViewModel = viewModel(factory = AppViewModelFactory.factory)
 ) {
-    val thisDay by viewModel.todayThisDay.collectAsStateWithLifecycle()
+    val sections by viewModel.sections.collectAsStateWithLifecycle()
     val total by viewModel.totalNotes.collectAsStateWithLifecycle()
 
     NkNoteTheme {
@@ -68,6 +71,15 @@ fun ExplorePage(
                 )
             }
         ) { padding ->
+            if (total == 0) {
+                // Brand-new user: nothing to explore at all.
+                NkEmptyState(
+                    message = stringResource(R.string.explore_no_notes),
+                    icon = Icons.Filled.Explore,
+                    modifier = Modifier.padding(padding)
+                )
+                return@Scaffold
+            }
             LazyColumn(
                 contentPadding = nkListPadding(padding),
                 verticalArrangement = Arrangement.spacedBy(NkSpacing.md),
@@ -82,15 +94,31 @@ fun ExplorePage(
                         icon = Icons.Filled.AutoAwesome
                     )
                 }
-                if (thisDay.isEmpty()) {
+                if (sections.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.explore_this_day_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                        }
+                        NkEmptyState(
+                            message = stringResource(R.string.explore_this_day_empty),
+                            fillMaxSize = false
+                        )
                     }
                 } else {
-                    items(thisDay, key = { it.id }) { note ->
-                        ExploreRow(note = note, onClick = { openNote(note.id) })
+                    sections.forEach { section ->
+                        item(key = "year-${section.year}") {
+                            Text(
+                                text = stringResource(R.string.explore_years_ago, section.yearsAgo, section.year),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = NkSpacing.sm)
+                            )
+                        }
+                        items(section.notes, key = { it.id }) { note ->
+                            ExploreRow(
+                                note = note,
+                                onClick = { openNote(note.id) },
+                                modifier = Modifier.animateItemPlacement()
+                            )
+                        }
                     }
                 }
             }
@@ -102,9 +130,9 @@ fun ExplorePage(
 private fun ExploreHeader(total: Int) {
     Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = NkShapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(NkSpacing.xl)) {
-            Text(stringResource(R.string.explore_dates_written, total), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.explore_notes_count, total), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(NkSpacing.xs))
-            Text(stringResource(R.string.drawer_greeting), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(stringResource(R.string.explore_header_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
     }
 }
@@ -118,14 +146,19 @@ private fun SectionTitle(text: String, icon: androidx.compose.ui.graphics.vector
 }
 
 @Composable
-private fun ExploreRow(note: Note, onClick: () -> Unit) {
-    NkNoteCard(onClick = onClick, onLongClick = {}) {
+private fun ExploreRow(note: Note, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // No onLongClick: the card is a plain clickable, so long-presses are not swallowed.
+    NkNoteCard(onClick = onClick, modifier = modifier) {
         Column {
             Text(note.title.ifBlank { stringResource(R.string.common_no_title) }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(NkSpacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Weather.fromKey(note.weather)?.let { Icon(WeatherIconMap.icon(it), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NkIconSize.sm)) }
-                Mood.fromKey(note.mood)?.let { Icon(MoodIconMap.icon(it), null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(NkIconSize.sm)) }
+                Weather.fromKey(note.weather)?.let {
+                    Icon(WeatherIconMap.icon(it), stringResource(WeatherIconMap.labelRes(it)), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NkIconSize.sm))
+                }
+                Mood.fromKey(note.mood)?.let {
+                    Icon(MoodIconMap.icon(it), stringResource(MoodIconMap.labelRes(it)), tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(NkIconSize.sm))
+                }
                 Text(note.date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
